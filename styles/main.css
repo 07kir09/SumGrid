@@ -1369,45 +1369,84 @@ button {
 
 @media (max-width: 640px) {
   .page-shell {
-    padding: 12px;
+    padding: 10px;
   }
 
   .topbar {
-    gap: 10px;
-    padding: 10px 12px;
+    gap: 8px;
+    padding: 10px;
   }
 
   .topbar__brand {
     align-items: flex-start;
+    gap: 8px;
   }
 
   .topbar__logo {
-    width: 50px;
-    height: 50px;
+    width: 44px;
+    height: 44px;
   }
 
   .topbar__title {
-    font-size: clamp(1.45rem, 8vw, 2rem);
+    font-size: clamp(1.3rem, 8vw, 1.72rem);
   }
 
   .topbar__subtitle {
     display: none;
   }
 
+  .eyebrow,
+  .section-label {
+    font-size: 0.6rem;
+    letter-spacing: 0.16em;
+  }
+
+  .topbar__stats {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 2px 2px 6px;
+    margin-inline: -2px;
+    scroll-snap-type: x proximity;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .topbar__stats::-webkit-scrollbar,
+  .board-stage__status::-webkit-scrollbar,
+  .choice-row::-webkit-scrollbar,
+  .status-strip__stats::-webkit-scrollbar {
+    display: none;
+  }
+
+  .topbar__stats .metric-card {
+    min-width: 88px;
+    flex: 0 0 auto;
+    scroll-snap-align: start;
+  }
+
   .panel {
-    border-radius: 24px;
+    border-radius: 20px;
   }
 
   .board-stage {
-    padding: 12px;
+    padding: 10px;
   }
 
   .board-stage__title {
-    font-size: 0.96rem;
+    font-size: 0.88rem;
   }
 
   .board-stage__hint {
-    font-size: 0.74rem;
+    display: none;
+  }
+
+  .board-stage__status {
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    margin-inline: -2px;
+    padding-inline: 2px;
   }
 
   .hero-card {
@@ -1425,12 +1464,16 @@ button {
   }
 
   .metric-card {
-    padding: 13px;
-    border-radius: 16px;
+    padding: 9px 10px;
+    border-radius: 14px;
+  }
+
+  .metric-card span {
+    font-size: 0.58rem;
   }
 
   .metric-card strong {
-    font-size: 1rem;
+    font-size: 0.82rem;
   }
 
   .main-grid {
@@ -1450,24 +1493,27 @@ button {
   }
 
   .chip {
-    min-height: 1.85rem;
-    padding: 0 10px;
-    font-size: 0.72rem;
+    min-height: 1.7rem;
+    padding: 0 9px;
+    font-size: 0.64rem;
+    white-space: nowrap;
   }
 
   .progress-block {
-    padding: 12px 14px;
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 16px;
   }
 
   .board-arena {
-    margin-top: 14px;
-    padding: 12px;
-    border-radius: 20px;
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 18px;
   }
 
   .board-arena::before {
-    inset: 7px;
-    border-radius: 15px;
+    inset: 6px;
+    border-radius: 13px;
   }
 
   .board-rail--top,
@@ -1526,34 +1572,41 @@ button {
   .grid-cell,
   .line-total,
   .grid-corner {
-    min-height: 56px;
-    border-radius: 16px;
+    min-height: 50px;
+    border-radius: 14px;
   }
 
   .grid-cell {
-    padding: 10px;
+    padding: 8px;
   }
 
   .cell__value {
-    font-size: clamp(0.98rem, 4vw, 1.24rem);
+    font-size: clamp(0.88rem, 3.5vw, 1.08rem);
   }
 
   .cell__cross {
-    font-size: 1.45rem;
+    font-size: 1.2rem;
   }
 
   .line-total,
   .grid-corner {
-    padding: 10px;
+    padding: 8px;
+    gap: 3px;
   }
 
   .line-total strong,
   .grid-corner span {
-    font-size: 0.96rem;
+    font-size: 0.86rem;
   }
 
   .line-total span:last-child {
-    font-size: 0.72rem;
+    font-size: 0.64rem;
+  }
+
+  .line-total__label,
+  .grid-corner small {
+    font-size: 0.54rem;
+    letter-spacing: 0.1em;
   }
 
   .legend-item,
@@ -1562,52 +1615,121 @@ button {
     padding: 12px;
   }
 
-  .choice-pill,
-  .action-button {
-    min-height: 40px;
-    font-size: 0.78rem;
+  .control-rack {
+    gap: 10px;
+    margin-top: 12px;
   }
 
-  .chip {
-    font-size: 0.68rem;
+  .control-group {
+    padding: 10px;
+    border-radius: 14px;
+  }
+
+  .choice-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    margin-inline: -2px;
+    padding-inline: 2px;
+  }
+
+  .choice-pill {
+    min-height: 36px;
+    min-width: max-content;
+    padding: 0 11px;
+    border-radius: 13px;
+    font-size: 0.74rem;
+    flex: 0 0 auto;
+  }
+
+  .control-group__hint {
+    margin-top: 6px;
+    font-size: 0.7rem;
+    line-height: 1.36;
+  }
+
+  .control-rack__row--actions {
+    position: sticky;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    z-index: 6;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background:
+      linear-gradient(180deg, rgba(11, 20, 36, 0.94), rgba(11, 20, 36, 0.86)),
+      rgba(11, 20, 36, 0.88);
+    box-shadow:
+      0 12px 24px rgba(0, 0, 0, 0.28),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    backdrop-filter: blur(18px);
+  }
+
+  .action-button {
+    min-height: 38px;
+    border-radius: 13px;
+    font-size: 0.74rem;
   }
 
   .status-strip {
-    padding: 10px 12px;
+    padding: 10px;
+    border-radius: 14px;
   }
 
   .status-strip__message {
-    font-size: 0.8rem;
+    font-size: 0.74rem;
+    line-height: 1.42;
+  }
+
+  .status-strip__stats {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    margin-inline: -2px;
+    padding-inline: 2px;
   }
 
   .status-pill {
-    min-height: 28px;
-    font-size: 0.7rem;
+    min-height: 26px;
+    min-width: max-content;
+    font-size: 0.66rem;
+    flex: 0 0 auto;
+    padding: 0 8px;
+  }
+
+  .status-pill b {
+    font-size: 0.58rem;
   }
 
   .board-overlay__card--compact {
     width: 100%;
-    padding: 14px;
+    max-width: 280px;
+    padding: 12px;
   }
 
   .board-overlay__button--compact {
     max-width: none;
   }
 
+  .board-overlay__intro {
+    font-size: 0.76rem;
+  }
+
   .board-rules summary {
-    padding: 9px 10px;
-    font-size: 0.66rem;
+    padding: 8px 10px;
+    font-size: 0.6rem;
   }
 
   .board-rules__content p {
-    font-size: 0.74rem;
+    font-size: 0.68rem;
+    line-height: 1.38;
   }
 
   .board-overlay__card {
     width: 100%;
     max-height: calc(100svh - 24px);
-    padding: 16px;
-    border-radius: 18px;
+    padding: 14px;
+    border-radius: 16px;
   }
 
   .board-overlay__rules {
@@ -1618,6 +1740,46 @@ button {
   .board-overlay__rules-list p {
     font-size: 0.84rem;
     line-height: 1.46;
+  }
+}
+
+@media (max-width: 430px) {
+  .topbar__stats .metric-card {
+    min-width: 82px;
+  }
+
+  .board-grid {
+    gap: 6px;
+  }
+
+  .grid-cell,
+  .line-total,
+  .grid-corner {
+    min-height: 46px;
+    border-radius: 12px;
+  }
+
+  .cell__value {
+    font-size: clamp(0.8rem, 3.4vw, 0.98rem);
+  }
+
+  .line-total,
+  .grid-corner {
+    padding: 7px;
+  }
+
+  .line-total strong,
+  .grid-corner span {
+    font-size: 0.8rem;
+  }
+
+  .line-total span:last-child {
+    font-size: 0.6rem;
+  }
+
+  .control-rack__row--actions {
+    grid-template-columns: 1fr 1fr;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
   }
 }
 
