@@ -328,7 +328,9 @@ function renderActionButton(action, label, variant) {
 }
 
 function renderBoard(viewModel) {
-  const cellMin = viewModel.size >= 7 ? 56 : viewModel.size === 6 ? 64 : 72;
+  const cellMin =
+    viewModel.size >= 7 ? 46 : viewModel.size === 6 ? 52 : viewModel.size === 5 ? 58 : 64;
+  const totalMin = viewModel.size >= 7 ? 72 : viewModel.size === 6 ? 76 : 82;
   const content = [];
 
   viewModel.puzzle.numbers.forEach((row, rowIndex) => {
@@ -385,7 +387,7 @@ function renderBoard(viewModel) {
   return `
     <div
       class="board-grid"
-      style="--board-size: ${viewModel.size}; --cell-min: ${cellMin}px;"
+      style="--board-size: ${viewModel.size}; --cell-min: ${cellMin}px; --total-min: ${totalMin}px;"
     >
       ${content.join("")}
     </div>
