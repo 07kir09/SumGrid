@@ -47,6 +47,7 @@ export function getLineStatus(current, target) {
 export function generatePuzzle({ size, difficultyId = DEFAULT_DIFFICULTY }) {
   const difficulty = DIFFICULTIES[difficultyId] ?? DIFFICULTIES[DEFAULT_DIFFICULTY];
   let fallbackPuzzle = null;
+  let bestScore = Number.NEGATIVE_INFINITY;
 
   for (let attempt = 0; attempt < difficulty.maxAttempts; attempt += 1) {
     const numbers = createNumberGrid(size, difficulty);
@@ -55,11 +56,26 @@ export function generatePuzzle({ size, difficultyId = DEFAULT_DIFFICULTY }) {
     const solutionCount = countSolutions(puzzle, 2);
 
     if (solutionCount === 1) {
-      return {
+      const analysis = analyzePuzzle(puzzle);
+      const qualityScore = scorePuzzleDifficulty(analysis);
+      const candidate = {
         ...puzzle,
         integrity: "unique",
         solutionCount,
+        analysis,
+        qualityScore,
       };
+
+      if (passesDifficultyProfile(size, difficulty, analysis)) {
+        return candidate;
+      }
+
+      if (qualityScore > bestScore) {
+        fallbackPuzzle = candidate;
+        bestScore = qualityScore;
+      }
+
+      continue;
     }
 
     if (!fallbackPuzzle) {
@@ -76,18 +92,28 @@ export function generatePuzzle({ size, difficultyId = DEFAULT_DIFFICULTY }) {
 
 function createNumberGrid(size, difficulty) {
   const [minValue, maxValue] = difficulty.valueRange;
+  const duplicateChance = difficulty.duplicateChance ?? 0;
+  const paletteSize = clamp(Math.round(size * 0.6), 3, Math.min(5, maxValue - minValue + 1));
+  const palette = Array.from({ length: paletteSize }, () => randomInt(minValue, maxValue));
 
   return createMatrix(size, () => {
-    const baseValue = randomInt(minValue, maxValue);
-    const spike = Math.random() > 0.84 ? 1 : 0;
+    const baseValue =
+      Math.random() < duplicateChance
+        ? palette[randomInt(0, palette.length - 1)]
+        : randomInt(minValue, maxValue);
+    const spike = Math.random() > 0.9 ? 1 : 0;
     return clamp(baseValue + spike, minValue, maxValue);
   });
 }
 
 function createSolutionPattern(size, difficulty) {
   const [minDensity, maxDensity] = difficulty.densityRange;
-  const minSelectedPerLine = 1;
-  const maxSelectedPerLine = size - 1;
+  const minSelectedPerLine = clamp(difficulty.lineSelectionRange?.[0] ?? 1, 1, size - 1);
+  const maxSelectedPerLine = clamp(
+    difficulty.lineSelectionRange?.[1] ?? size - 1,
+    minSelectedPerLine,
+    size - 1
+  );
 
   for (let attempt = 0; attempt < 80; attempt += 1) {
     const density = minDensity + Math.random() * (maxDensity - minDensity);
@@ -292,7 +318,7 @@ function finalizePuzzle({ size, difficultyId, numbers, solution }) {
 
 function countSolutions(puzzle, limit = 2) {
   const rowMeta = puzzle.numbers.map((rowValues, rowIndex) => {
-    const candidates = buildRowCandidates(rowValues, puzzle.rowTargets[rowIndex]);
+    const candidates = buildLineCandidates(rowValues, puzzle.rowTargets[rowIndex]);
     return {
       rowIndex,
       candidates,
@@ -373,20 +399,20 @@ function countSolutions(puzzle, limit = 2) {
   return search(0, Array(puzzle.size).fill(0));
 }
 
-function buildRowCandidates(rowValues, target) {
-  const candidateCount = 1 << rowValues.length;
+function buildLineCandidates(lineValues, target) {
+  const candidateCount = 1 << lineValues.length;
   const candidates = [];
 
   for (let mask = 0; mask < candidateCount; mask += 1) {
     let total = 0;
-    const columnAdds = Array(rowValues.length).fill(0);
+    const columnAdds = Array(lineValues.length).fill(0);
 
-    for (let columnIndex = 0; columnIndex < rowValues.length; columnIndex += 1) {
+    for (let columnIndex = 0; columnIndex < lineValues.length; columnIndex += 1) {
       if ((mask & (1 << columnIndex)) === 0) {
         continue;
       }
 
-      const value = rowValues[columnIndex];
+      const value = lineValues[columnIndex];
       total += value;
       columnAdds[columnIndex] = value;
 
@@ -401,6 +427,83 @@ function buildRowCandidates(rowValues, target) {
   }
 
   return candidates;
+}
+
+function analyzePuzzle(puzzle) {
+  const rowCandidateCounts = puzzle.numbers.map((rowValues, rowIndex) =>
+    buildLineCandidates(rowValues, puzzle.rowTargets[rowIndex]).length
+  );
+  const columnCandidateCounts = Array.from({ length: puzzle.size }, (_, columnIndex) =>
+    buildLineCandidates(
+      puzzle.numbers.map((row) => row[columnIndex]),
+      puzzle.columnTargets[columnIndex]
+    ).length
+  );
+  const lineCandidateCounts = [...rowCandidateCounts, ...columnCandidateCounts];
+  const lineTargetRatios = [
+    ...puzzle.numbers.map((row, rowIndex) => puzzle.rowTargets[rowIndex] / sum(row)),
+    ...Array.from({ length: puzzle.size }, (_, columnIndex) => {
+      const columnValues = puzzle.numbers.map((row) => row[columnIndex]);
+      return puzzle.columnTargets[columnIndex] / sum(columnValues);
+    }),
+  ];
+
+  return {
+    rowCandidateCounts,
+    columnCandidateCounts,
+    lineCandidateCounts,
+    averageLineCandidates: sum(lineCandidateCounts) / lineCandidateCounts.length,
+    minLineCandidates: Math.min(...lineCandidateCounts),
+    trivialLineCount: lineCandidateCounts.filter((count) => count <= 2).length,
+    richLineCount: lineCandidateCounts.filter((count) => count >= 4).length,
+    balancedLineCount: lineTargetRatios.filter((ratio) => ratio >= 0.28 && ratio <= 0.78)
+      .length,
+    lineTargetRatios,
+  };
+}
+
+function passesDifficultyProfile(size, difficulty, analysis) {
+  const profile = difficulty.ambiguityProfile;
+
+  if (!profile) {
+    return true;
+  }
+
+  const minimumLineCandidates =
+    size >= 6 && Number.isFinite(profile.minLineCandidatesLargeBoard)
+      ? profile.minLineCandidatesLargeBoard
+      : profile.minLineCandidates;
+  const averageTarget = profile.averageBase + profile.averagePerSize * Math.max(0, size - 4);
+  const [minBalancedRatio, maxBalancedRatio] = profile.balancedTargetRange;
+  const balancedLineCount = analysis.lineTargetRatios.filter(
+    (ratio) => ratio >= minBalancedRatio && ratio <= maxBalancedRatio
+  ).length;
+  const requiredRichLines = Math.ceil(
+    analysis.lineCandidateCounts.length * profile.minRichLineShare
+  );
+  const requiredBalancedLines = Math.ceil(
+    analysis.lineCandidateCounts.length * profile.minBalancedLineShare
+  );
+
+  analysis.balancedLineCount = balancedLineCount;
+
+  return (
+    analysis.averageLineCandidates >= averageTarget &&
+    analysis.minLineCandidates >= minimumLineCandidates &&
+    analysis.trivialLineCount <= profile.maxTrivialLines &&
+    analysis.richLineCount >= requiredRichLines &&
+    balancedLineCount >= requiredBalancedLines
+  );
+}
+
+function scorePuzzleDifficulty(analysis) {
+  return (
+    analysis.averageLineCandidates * 28 +
+    analysis.minLineCandidates * 10 +
+    analysis.richLineCount * 4 +
+    analysis.balancedLineCount * 2 -
+    analysis.trivialLineCount * 14
+  );
 }
 
 function buildSuffixBounds(rowMeta, size) {

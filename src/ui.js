@@ -49,6 +49,7 @@ export class SumGridUI {
       this.root.querySelector("[data-board-scroll]")?.scrollLeft ?? 0;
     const isUnlocking =
       this.hasRenderedOnce && this.previousBoardLocked && !viewModel.boardLocked;
+    const boardCode = viewModel.puzzle.id.slice(-4).toUpperCase();
 
     document.title = viewModel.isSolved
       ? "Sum Grid - Решено"
@@ -59,38 +60,37 @@ export class SumGridUI {
         <div class="backdrop-orb backdrop-orb--left"></div>
         <div class="backdrop-orb backdrop-orb--right"></div>
 
-        <header class="hero-card panel">
-          <div class="hero-brand">
-            <div class="hero-logo-wrap">
-              <img class="hero-logo" src="./assets/logo-sum-grid.svg" alt="Логотип Sum Grid" />
-            </div>
-            <div class="hero-card__copy">
+        <header class="topbar panel">
+          <div class="topbar__brand">
+            <img class="topbar__logo" src="./assets/logo-sum-grid.svg" alt="Логотип Sum Grid" />
+            <div class="topbar__copy">
               <div class="eyebrow">Премиальная логическая головоломка</div>
-              <h1 class="hero-title"><span>Sum</span> Grid</h1>
-              <p class="hero-subtitle">
-                Отмечай нужные клетки так, чтобы сумма выбранных чисел в каждой строке совпала с
-                целью справа, а в каждом столбце с целью снизу.
-              </p>
+              <h1 class="topbar__title"><span>Sum</span> Grid</h1>
+              <p class="topbar__subtitle">Собери точные суммы в строках и столбцах.</p>
             </div>
           </div>
 
-          <div class="metrics-grid">
+          <div class="topbar__stats">
             ${renderMetric("Поле", `${viewModel.size}×${viewModel.size}`)}
-            ${renderMetric("Сложность", viewModel.difficulty.label)}
+            ${renderMetric("Режим", viewModel.difficulty.label)}
+            ${renderMetric("Раунд", `#${boardCode}`)}
             ${renderMetric("Время", viewModel.elapsedLabel, "timer")}
             ${renderMetric("Победы", String(viewModel.totalWins))}
           </div>
         </header>
 
-        <main class="main-grid">
-          <section class="board-panel panel">
-            <div class="board-panel__top">
+        <main class="play-layout">
+          <section class="board-stage panel">
+            <div class="board-stage__header">
               <div>
                 <div class="section-label">Игровое поле</div>
-                <h2>Клик по клетке: пусто → выбрано → зачеркнуто</h2>
+                <h2 class="board-stage__title">Пусто → выбрано → зачеркнуто</h2>
+                <p class="board-stage__hint">
+                  Выбранные клетки входят в сумму. Цели справа и снизу должны совпасть.
+                </p>
               </div>
 
-              <div class="board-meta">
+              <div class="board-stage__status">
                 <span class="chip" data-tone="${viewModel.themeTone}">
                   ${viewModel.correctLines}/${viewModel.totalLines} линий совпало
                 </span>
@@ -129,29 +129,29 @@ export class SumGridUI {
                 viewModel.boardLocked
                   ? `
                     <div class="board-overlay">
-                      <div class="board-overlay__card">
+                      <div class="board-overlay__card board-overlay__card--compact">
                         <div class="section-label">Раунд не начат</div>
                         <h3>${viewModel.startButtonLabel}</h3>
                         <p class="board-overlay__intro">
-                          Если хотите продолжить, нажмите кнопку ниже или ознакомьтесь с правилами игры.
+                          Если хотите продолжить, нажмите кнопку ниже или откройте правила игры.
                         </p>
-                        <button class="action-button action-button--primary board-overlay__button" data-action="start">
+                        <button class="action-button action-button--primary board-overlay__button board-overlay__button--compact" data-action="start">
                           ${viewModel.startButtonLabel}
                         </button>
-                        <div class="board-overlay__rules">
-                          <div class="board-overlay__rules-title">Правила игры</div>
-                          <div class="board-overlay__rules-list">
-                            <p>1. На поле находится квадратная сетка с числами. Каждая клетка содержит одно значение.</p>
-                            <p>2. Твоя задача — отметить такие клетки, чтобы сумма выбранных чисел в каждой строке совпала с целью справа.</p>
+                        <details class="board-rules">
+                          <summary>Правила игры</summary>
+                          <div class="board-rules__content">
+                            <p>1. На поле квадратная сетка с числами. Каждая клетка содержит одно значение.</p>
+                            <p>2. Нужно отметить такие клетки, чтобы сумма выбранных чисел в каждой строке совпала с целью справа.</p>
                             <p>3. Одновременно сумма выбранных чисел в каждом столбце должна совпасть с целью снизу.</p>
                             <p>4. Нажатие на клетку переключает её состояние по кругу: пусто → выбрано → зачеркнуто → пусто.</p>
-                            <p>5. В расчёт суммы входят только выбранные клетки. Зачеркнутые клетки считаются исключёнными и в сумму не добавляются.</p>
-                            <p>6. Если сумма линии уже равна цели, линия считается правильной. Если сумма больше цели, линия подсвечивается как превышенная. Если сумма меньше цели, линия ещё не завершена.</p>
-                            <p>7. Победа засчитывается только тогда, когда все строки и все столбцы одновременно точно совпадают со своими целями.</p>
-                            <p>8. Кнопка «Проверить» подсказывает текущее состояние решения, «Сброс» очищает отметки, а «Показать решение» открывает правильный узор клеток.</p>
+                            <p>5. В расчёт суммы входят только выбранные клетки. Зачеркнутые клетки исключаются.</p>
+                            <p>6. Если сумма линии равна цели, она верна. Если больше цели, линия превышена. Если меньше, она ещё не собрана.</p>
+                            <p>7. Победа засчитывается только тогда, когда все строки и все столбцы одновременно точно совпадают с целями.</p>
+                            <p>8. «Проверить» оценивает текущее решение, «Сброс» очищает отметки, «Показать решение» открывает правильный узор.</p>
                             <p>9. Таймер запускается только после нажатия на «Начать игру» или «Продолжить игру».</p>
                           </div>
-                        </div>
+                        </details>
                       </div>
                     </div>
                   `
@@ -172,95 +172,66 @@ export class SumGridUI {
               </div>
             </div>
 
-            <div class="legend">
-              <div class="legend-item">
-                <span class="legend-swatch legend-swatch--selected"></span>
-                <span>Выбранные клетки входят в сумму</span>
-              </div>
-              <div class="legend-item">
-                <span class="legend-swatch legend-swatch--crossed"></span>
-                <span>Зачеркнутые клетки исключены</span>
-              </div>
-              <div class="legend-item">
-                <span class="legend-swatch legend-swatch--solution"></span>
-                <span>Показ решения подсвечивает правильный узор</span>
-              </div>
-            </div>
-          </section>
+            <div class="control-rack">
+              <div class="control-rack__row">
+                <div class="control-group">
+                  <div class="section-label">Размер поля</div>
+                  <div class="choice-row">
+                    ${viewModel.boardSizes
+                      .map(
+                        (size) => `
+                          <button
+                            class="choice-pill ${size === viewModel.size ? "is-active" : ""}"
+                            data-size="${size}"
+                          >
+                            ${size}×${size}
+                          </button>
+                        `
+                      )
+                      .join("")}
+                  </div>
+                </div>
 
-          <aside class="sidebar">
-            <section class="panel control-panel">
-              <div class="section-label">Сложность</div>
-              <div class="choice-grid choice-grid--stacked">
-                ${viewModel.difficulties
-                  .map(
-                    (difficulty) => `
-                      <button
-                        class="choice-card ${
-                          difficulty.id === viewModel.difficultyId ? "is-active" : ""
-                        }"
-                        data-difficulty="${difficulty.id}"
-                      >
-                        <strong>${difficulty.label}</strong>
-                        <span>${difficulty.description}</span>
-                      </button>
-                    `
-                  )
-                  .join("")}
+                <div class="control-group">
+                  <div class="section-label">Сложность</div>
+                  <div class="choice-row">
+                    ${viewModel.difficulties
+                      .map(
+                        (difficulty) => `
+                          <button
+                            class="choice-pill ${
+                              difficulty.id === viewModel.difficultyId ? "is-active" : ""
+                            }"
+                            data-difficulty="${difficulty.id}"
+                          >
+                            ${difficulty.label}
+                          </button>
+                        `
+                      )
+                      .join("")}
+                  </div>
+                  <p class="control-group__hint">${viewModel.difficulty.description}</p>
+                </div>
               </div>
-            </section>
 
-            <section class="panel control-panel">
-              <div class="section-label">Размер поля</div>
-              <div class="choice-grid">
-                ${viewModel.boardSizes
-                  .map(
-                    (size) => `
-                      <button
-                        class="choice-pill ${size === viewModel.size ? "is-active" : ""}"
-                        data-size="${size}"
-                      >
-                        ${size}×${size}
-                      </button>
-                    `
-                  )
-                  .join("")}
-              </div>
-            </section>
-
-            <section class="panel action-panel">
-              <div class="section-label">Управление</div>
-              <div class="action-grid">
+              <div class="control-rack__row control-rack__row--actions">
                 ${renderActionButton("new-game", "Новая игра", "primary")}
                 ${renderActionButton("reset", "Сброс", "ghost")}
                 ${renderActionButton("check", "Проверить", "success")}
                 ${renderActionButton("solution", viewModel.showSolutionLabel, "accent")}
               </div>
-            </section>
 
-            <section class="panel status-panel" data-tone="${viewModel.themeTone}">
-              <div class="section-label">Статус</div>
-              <p class="status-message">${viewModel.message}</p>
-              <div class="status-grid">
-                <div class="status-card">
-                  <span>Ходы</span>
-                  <strong>${viewModel.moves}</strong>
-                </div>
-                <div class="status-card">
-                  <span>Проверки</span>
-                  <strong>${viewModel.checks}</strong>
-                </div>
-                <div class="status-card">
-                  <span>Превышено</span>
-                  <strong>${viewModel.exceededLines}</strong>
-                </div>
-                <div class="status-card">
-                  <span>Не собрано</span>
-                  <strong>${viewModel.incompleteLines}</strong>
+              <div class="status-strip" data-tone="${viewModel.themeTone}">
+                <p class="status-strip__message">${viewModel.message}</p>
+                <div class="status-strip__stats">
+                  <span class="status-pill"><b>Ходы</b>${viewModel.moves}</span>
+                  <span class="status-pill"><b>Проверки</b>${viewModel.checks}</span>
+                  <span class="status-pill"><b>Превышено</b>${viewModel.exceededLines}</span>
+                  <span class="status-pill"><b>Не собрано</b>${viewModel.incompleteLines}</span>
                 </div>
               </div>
-            </section>
-          </aside>
+            </div>
+          </section>
         </main>
       </div>
     `;
