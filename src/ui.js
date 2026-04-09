@@ -251,6 +251,16 @@ export class SumGridUI {
       nextBoardScroll.scrollLeft = previousBoardScroll;
     }
 
+    if (isUnlocking) {
+      const exitOverlay = this.root.querySelector(".board-overlay--exit");
+
+      if (exitOverlay) {
+        window.setTimeout(() => {
+          exitOverlay.remove();
+        }, 440);
+      }
+    }
+
     this.hasRenderedOnce = true;
     this.previousBoardLocked = viewModel.boardLocked;
   }
