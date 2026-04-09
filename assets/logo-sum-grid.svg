@@ -1,0 +1,167 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 900" role="img" aria-labelledby="logoTitle logoDesc">
+  <title id="logoTitle">Sum Grid</title>
+  <desc id="logoDesc">Stylized Sum Grid logo with glowing board cells, blue and amber rings, and the Sum Grid title.</desc>
+  <defs>
+    <linearGradient id="bgGlowBlue" x1="232" y1="156" x2="540" y2="488" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#55DBFF" stop-opacity=".8"/>
+      <stop offset="1" stop-color="#55DBFF" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="bgGlowOrange" x1="666" y1="144" x2="742" y2="594" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF9E39" stop-opacity=".9"/>
+      <stop offset="1" stop-color="#FF9E39" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="boardFill" x1="225" y1="126" x2="695" y2="724" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#17253B"/>
+      <stop offset="1" stop-color="#090F19"/>
+    </linearGradient>
+    <linearGradient id="boardEdge" x1="225" y1="126" x2="695" y2="724" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#293D5D"/>
+      <stop offset=".45" stop-color="#0E1625"/>
+      <stop offset="1" stop-color="#334A6D"/>
+    </linearGradient>
+    <linearGradient id="cellBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#1F5C9D"/>
+      <stop offset=".55" stop-color="#30A8F4"/>
+      <stop offset="1" stop-color="#153862"/>
+    </linearGradient>
+    <linearGradient id="cellOrange" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#7A2800"/>
+      <stop offset=".55" stop-color="#FF8E1B"/>
+      <stop offset="1" stop-color="#542100"/>
+    </linearGradient>
+    <linearGradient id="cellDark" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#16263E"/>
+      <stop offset="1" stop-color="#0D1624"/>
+    </linearGradient>
+    <linearGradient id="titleBlue" x1="210" y1="320" x2="490" y2="562" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#D8FFFF"/>
+      <stop offset=".48" stop-color="#78E9FF"/>
+      <stop offset="1" stop-color="#3AB9FF"/>
+    </linearGradient>
+    <linearGradient id="titleGold" x1="280" y1="482" x2="540" y2="694" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF5A7"/>
+      <stop offset=".45" stop-color="#FFD548"/>
+      <stop offset="1" stop-color="#F59612"/>
+    </linearGradient>
+    <linearGradient id="ringBlue" x1="90" y1="640" x2="810" y2="640" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2BD6FF"/>
+      <stop offset=".5" stop-color="#80F0FF"/>
+      <stop offset="1" stop-color="#2BD6FF"/>
+    </linearGradient>
+    <linearGradient id="ringOrange" x1="120" y1="608" x2="850" y2="608" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFB52E"/>
+      <stop offset=".5" stop-color="#FFD36A"/>
+      <stop offset="1" stop-color="#FF8C1D"/>
+    </linearGradient>
+    <filter id="shadow" x="96" y="80" width="732" height="676" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="22" stdDeviation="22" flood-color="#000" flood-opacity=".48"/>
+    </filter>
+    <filter id="textGlowBlue" x="132" y="240" width="610" height="352" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="16" flood-color="#3DD8FF" flood-opacity=".35"/>
+      <feDropShadow dx="0" dy="18" stdDeviation="14" flood-color="#000" flood-opacity=".42"/>
+    </filter>
+    <filter id="textGlowGold" x="208" y="430" width="466" height="292" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="12" flood-color="#FFB72A" flood-opacity=".3"/>
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity=".44"/>
+    </filter>
+    <filter id="ringGlowBlue" x="42" y="466" width="812" height="276" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#3EDBFF" flood-opacity=".8"/>
+    </filter>
+    <filter id="ringGlowOrange" x="104" y="424" width="754" height="294" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#FF9B20" flood-opacity=".78"/>
+    </filter>
+  </defs>
+
+  <ellipse cx="362" cy="286" rx="204" ry="214" fill="url(#bgGlowBlue)"/>
+  <ellipse cx="692" cy="314" rx="170" ry="242" fill="url(#bgGlowOrange)"/>
+
+  <g filter="url(#shadow)">
+    <rect x="212" y="130" width="510" height="596" rx="34" fill="url(#boardFill)" stroke="url(#boardEdge)" stroke-width="6"/>
+    <rect x="232" y="150" width="470" height="556" rx="26" fill="#0B1220" stroke="rgba(255,255,255,.06)" stroke-width="2"/>
+
+    <g opacity=".95">
+      <rect x="238" y="176" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#516B8B" stroke-opacity=".42" stroke-width="3"/>
+      <path d="M261 201L309 249" stroke="#90A8C5" stroke-opacity=".68" stroke-width="12" stroke-linecap="round"/>
+      <path d="M309 201L261 249" stroke="#90A8C5" stroke-opacity=".68" stroke-width="12" stroke-linecap="round"/>
+
+      <rect x="338" y="176" width="92" height="92" rx="8" fill="url(#cellBlue)" stroke="#8FE7FF" stroke-opacity=".72" stroke-width="3"/>
+      <text x="384" y="242" fill="#E6FBFF" font-size="58" font-family="'Trebuchet MS', 'Segoe UI', sans-serif" font-weight="700" text-anchor="middle">4</text>
+
+      <rect x="438" y="176" width="92" height="92" rx="8" fill="url(#cellBlue)" stroke="#8FE7FF" stroke-opacity=".72" stroke-width="3"/>
+      <text x="484" y="242" fill="#E6FBFF" font-size="58" font-family="'Trebuchet MS', 'Segoe UI', sans-serif" font-weight="700" text-anchor="middle">7</text>
+
+      <rect x="538" y="176" width="92" height="92" rx="8" fill="url(#cellOrange)" stroke="#FFC66C" stroke-opacity=".78" stroke-width="3"/>
+      <path d="M562 200L608 246" stroke="#FFD48B" stroke-width="14" stroke-linecap="round"/>
+      <path d="M608 200L562 246" stroke="#FFD48B" stroke-width="14" stroke-linecap="round"/>
+
+      <circle cx="724" cy="178" r="68" fill="#1E1B1E" stroke="#F6D7A2" stroke-width="5"/>
+      <circle cx="724" cy="178" r="58" fill="#251A16" stroke="#FFE1A7" stroke-opacity=".55" stroke-width="2"/>
+      <text x="724" y="200" fill="#FFF3D6" font-size="78" font-family="'Trebuchet MS', 'Segoe UI', sans-serif" font-weight="800" text-anchor="middle">15</text>
+    </g>
+
+    <g opacity=".9">
+      <rect x="238" y="276" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#495C74" stroke-opacity=".35" stroke-width="3"/>
+      <rect x="338" y="276" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#495C74" stroke-opacity=".35" stroke-width="3"/>
+      <rect x="438" y="276" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#495C74" stroke-opacity=".35" stroke-width="3"/>
+      <rect x="538" y="276" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#495C74" stroke-opacity=".35" stroke-width="3"/>
+      <path d="M559 298L609 348" stroke="#A4B5CA" stroke-opacity=".56" stroke-width="12" stroke-linecap="round"/>
+      <path d="M609 298L559 348" stroke="#A4B5CA" stroke-opacity=".56" stroke-width="12" stroke-linecap="round"/>
+      <rect x="638" y="276" width="92" height="92" rx="8" fill="url(#cellOrange)" stroke="#FFC66C" stroke-opacity=".7" stroke-width="3"/>
+      <path d="M660 298L708 346" stroke="#FFD48B" stroke-width="14" stroke-linecap="round"/>
+      <path d="M708 298L660 346" stroke="#FFD48B" stroke-width="14" stroke-linecap="round"/>
+    </g>
+
+    <g opacity=".78">
+      <rect x="238" y="376" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#48596E" stroke-opacity=".3" stroke-width="3"/>
+      <rect x="338" y="376" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#48596E" stroke-opacity=".3" stroke-width="3"/>
+      <rect x="438" y="376" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#48596E" stroke-opacity=".3" stroke-width="3"/>
+      <rect x="538" y="376" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#48596E" stroke-opacity=".3" stroke-width="3"/>
+      <rect x="638" y="376" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#48596E" stroke-opacity=".3" stroke-width="3"/>
+      <path d="M660 398L708 446" stroke="#8DA3BF" stroke-opacity=".45" stroke-width="12" stroke-linecap="round"/>
+      <path d="M708 398L660 446" stroke="#8DA3BF" stroke-opacity=".45" stroke-width="12" stroke-linecap="round"/>
+    </g>
+
+    <g opacity=".72">
+      <rect x="238" y="476" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#445366" stroke-opacity=".28" stroke-width="3"/>
+      <rect x="338" y="476" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#445366" stroke-opacity=".28" stroke-width="3"/>
+      <rect x="438" y="476" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#445366" stroke-opacity=".28" stroke-width="3"/>
+      <rect x="538" y="476" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#445366" stroke-opacity=".28" stroke-width="3"/>
+      <rect x="638" y="476" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#445366" stroke-opacity=".28" stroke-width="3"/>
+    </g>
+
+    <g opacity=".68">
+      <rect x="238" y="576" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#415062" stroke-opacity=".24" stroke-width="3"/>
+      <rect x="338" y="576" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#415062" stroke-opacity=".24" stroke-width="3"/>
+      <rect x="438" y="576" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#415062" stroke-opacity=".24" stroke-width="3"/>
+      <rect x="538" y="576" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#415062" stroke-opacity=".24" stroke-width="3"/>
+      <rect x="638" y="576" width="92" height="92" rx="8" fill="url(#cellDark)" stroke="#415062" stroke-opacity=".24" stroke-width="3"/>
+      <rect x="638" y="576" width="92" height="92" rx="8" fill="#32231E" stroke="#FFD18F" stroke-opacity=".55" stroke-width="3"/>
+      <text x="684" y="642" fill="#FFF2D2" font-size="68" font-family="'Trebuchet MS', 'Segoe UI', sans-serif" font-weight="800" text-anchor="middle">12</text>
+    </g>
+  </g>
+
+  <g filter="url(#ringGlowBlue)">
+    <path d="M114 620C188 671 280 699 387 704C513 710 637 680 740 612C786 582 823 547 850 510" fill="none" stroke="url(#ringBlue)" stroke-width="18" stroke-linecap="round"/>
+  </g>
+  <g filter="url(#ringGlowOrange)">
+    <path d="M228 602C297 535 376 491 481 480C593 468 707 498 823 577" fill="none" stroke="url(#ringOrange)" stroke-width="16" stroke-linecap="round"/>
+  </g>
+
+  <g filter="url(#textGlowBlue)">
+    <text x="156" y="514" fill="url(#titleBlue)" stroke="#0C2B57" stroke-width="18" paint-order="stroke fill" font-size="208" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="700">Sum</text>
+  </g>
+  <g filter="url(#textGlowGold)">
+    <text x="280" y="655" fill="url(#titleGold)" stroke="#5C2500" stroke-width="16" paint-order="stroke fill" font-size="176" font-family="Georgia, 'Times New Roman', serif" font-style="italic" font-weight="700">Grid</text>
+  </g>
+
+  <g opacity=".9">
+    <circle cx="132" cy="622" r="7" fill="#76EEFF"/>
+    <circle cx="782" cy="582" r="6" fill="#76EEFF"/>
+    <circle cx="744" cy="138" r="8" fill="#FFB33D"/>
+    <circle cx="116" cy="676" r="5" fill="#2BD6FF"/>
+    <circle cx="838" cy="258" r="5" fill="#FFB33D"/>
+    <circle cx="786" cy="240" r="4" fill="#FFB33D"/>
+    <circle cx="266" cy="148" r="4" fill="#2BD6FF"/>
+    <circle cx="574" cy="164" r="3" fill="#2BD6FF"/>
+  </g>
+</svg>
