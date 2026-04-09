@@ -81,6 +81,8 @@ select {
 button {
   border: 0;
   cursor: pointer;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
 }
 
 #app {
@@ -855,6 +857,8 @@ button {
   overflow: hidden;
   padding: 12px;
   color: var(--text-strong);
+  user-select: none;
+  -webkit-user-select: none;
   transition:
     transform 160ms ease,
     background 160ms ease,

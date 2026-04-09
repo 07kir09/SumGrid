@@ -8,34 +8,41 @@ export class SumGridUI {
     this.previousBoardLocked = false;
 
     this.root.addEventListener("click", (event) => {
-      const actionElement = event.target.closest("[data-action]");
+      const target =
+        event.target instanceof Element ? event.target : event.target?.parentElement;
+
+      if (!target) {
+        return;
+      }
+
+      const actionElement = target.closest("button[data-action]");
 
       if (actionElement) {
         this.handleAction(actionElement.dataset.action);
         return;
       }
 
-      const sizeElement = event.target.closest("[data-size]");
-
-      if (sizeElement) {
-        this.game.setSize(Number(sizeElement.dataset.size));
-        return;
-      }
-
-      const difficultyElement = event.target.closest("[data-difficulty]");
-
-      if (difficultyElement) {
-        this.game.setDifficulty(difficultyElement.dataset.difficulty);
-        return;
-      }
-
-      const cellElement = event.target.closest("[data-cell]");
+      const cellElement = target.closest("button[data-cell]");
 
       if (cellElement) {
         this.game.cycleCell(
           Number(cellElement.dataset.row),
           Number(cellElement.dataset.column)
         );
+        return;
+      }
+
+      const sizeElement = target.closest("button[data-size]");
+
+      if (sizeElement) {
+        this.game.setSize(Number(sizeElement.dataset.size));
+        return;
+      }
+
+      const difficultyElement = target.closest("button[data-difficulty]");
+
+      if (difficultyElement) {
+        this.game.setDifficulty(difficultyElement.dataset.difficulty);
       }
     });
   }
@@ -135,7 +142,7 @@ export class SumGridUI {
                         <p class="board-overlay__intro">
                           Если хотите продолжить, нажмите кнопку ниже или откройте правила игры.
                         </p>
-                        <button class="action-button action-button--primary board-overlay__button board-overlay__button--compact" data-action="start">
+                        <button type="button" class="action-button action-button--primary board-overlay__button board-overlay__button--compact" data-action="start">
                           ${viewModel.startButtonLabel}
                         </button>
                         <details class="board-rules">
@@ -181,6 +188,7 @@ export class SumGridUI {
                       .map(
                         (size) => `
                           <button
+                            type="button"
                             class="choice-pill ${size === viewModel.size ? "is-active" : ""}"
                             data-size="${size}"
                           >
@@ -199,6 +207,7 @@ export class SumGridUI {
                       .map(
                         (difficulty) => `
                           <button
+                            type="button"
                             class="choice-pill ${
                               difficulty.id === viewModel.difficultyId ? "is-active" : ""
                             }"
@@ -292,7 +301,7 @@ function renderMetric(label, value, role = "") {
 
 function renderActionButton(action, label, variant) {
   return `
-    <button class="action-button action-button--${variant}" data-action="${action}">
+    <button type="button" class="action-button action-button--${variant}" data-action="${action}">
       ${label}
     </button>
   `;
@@ -311,6 +320,7 @@ function renderBoard(viewModel) {
 
       content.push(`
         <button
+          type="button"
           class="grid-cell"
           data-cell="true"
           data-row="${rowIndex}"
