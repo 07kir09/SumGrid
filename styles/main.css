@@ -1693,29 +1693,29 @@ button {
     letter-spacing: 0.08em;
   }
 
-  .board-grid[data-size="6"] .line-total,
-  .board-grid[data-size="7"] .line-total,
-  .board-grid[data-size="6"] .grid-corner,
-  .board-grid[data-size="7"] .grid-corner {
+  .board-grid[data-board-size="6"] .line-total,
+  .board-grid[data-board-size="7"] .line-total,
+  .board-grid[data-board-size="6"] .grid-corner,
+  .board-grid[data-board-size="7"] .grid-corner {
     padding: 5px 4px;
   }
 
-  .board-grid[data-size="6"] .line-total strong,
-  .board-grid[data-size="7"] .line-total strong,
-  .board-grid[data-size="6"] .grid-corner span,
-  .board-grid[data-size="7"] .grid-corner span {
+  .board-grid[data-board-size="6"] .line-total strong,
+  .board-grid[data-board-size="7"] .line-total strong,
+  .board-grid[data-board-size="6"] .grid-corner span,
+  .board-grid[data-board-size="7"] .grid-corner span {
     font-size: 0.72rem;
   }
 
-  .board-grid[data-size="6"] .line-total__current,
-  .board-grid[data-size="7"] .line-total__current {
+  .board-grid[data-board-size="6"] .line-total__current,
+  .board-grid[data-board-size="7"] .line-total__current {
     font-size: 0.52rem;
   }
 
-  .board-grid[data-size="6"] .line-total__label,
-  .board-grid[data-size="7"] .line-total__label,
-  .board-grid[data-size="6"] .grid-corner small,
-  .board-grid[data-size="7"] .grid-corner small {
+  .board-grid[data-board-size="6"] .line-total__label,
+  .board-grid[data-board-size="7"] .line-total__label,
+  .board-grid[data-board-size="6"] .grid-corner small,
+  .board-grid[data-board-size="7"] .grid-corner small {
     font-size: 0.42rem;
   }
 

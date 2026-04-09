@@ -370,7 +370,7 @@ function renderBoard(viewModel) {
   return `
     <div
       class="board-grid"
-      data-size="${viewModel.size}"
+      data-board-size="${viewModel.size}"
       style="--board-size: ${viewModel.size}; --cell-min: ${cellMin}px; --total-min: ${totalMin}px;"
     >
       ${content.join("")}
