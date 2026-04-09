@@ -979,15 +979,34 @@ button {
   color: rgba(194, 205, 224, 0.58);
 }
 
+.line-total__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.line-total__label-short {
+  display: none;
+}
+
 .line-total strong,
 .grid-corner span {
   font-size: 1.08rem;
   color: var(--text-strong);
 }
 
-.line-total span:last-child {
+.line-total__current {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
   font-size: 0.78rem;
   color: var(--text-soft);
+}
+
+.line-total__current-value {
+  font-variant-numeric: tabular-nums;
 }
 
 .line-total[data-status="correct"] {
@@ -1500,9 +1519,31 @@ button {
   }
 
   .progress-block {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     margin-top: 10px;
-    padding: 10px 12px;
+    padding: 8px 10px;
     border-radius: 16px;
+  }
+
+  .progress-block__copy {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: max-content;
+  }
+
+  .progress-block__copy span {
+    font-size: 0.72rem;
+  }
+
+  .progress-block__copy strong {
+    font-size: 0.96rem;
+  }
+
+  .progress-track {
+    flex: 1;
   }
 
   .board-arena {
@@ -1569,15 +1610,28 @@ button {
     right: 10px;
   }
 
+  .board-scroll {
+    justify-content: stretch;
+    padding-bottom: 2px;
+  }
+
+  .board-grid {
+    width: 100%;
+    min-width: 0;
+    gap: 6px;
+    grid-template-columns: repeat(var(--board-size), minmax(0, 1fr)) minmax(clamp(38px, 12vw, 48px), 0.92fr);
+  }
+
   .grid-cell,
   .line-total,
   .grid-corner {
-    min-height: 50px;
+    min-height: 0;
     border-radius: 14px;
   }
 
   .grid-cell {
-    padding: 8px;
+    aspect-ratio: 1 / 1;
+    padding: 6px;
   }
 
   .cell__value {
@@ -1590,23 +1644,79 @@ button {
 
   .line-total,
   .grid-corner {
-    padding: 8px;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    padding: 6px 5px;
+    text-align: center;
+  }
+
+  .line-total--column,
+  .grid-corner {
+    aspect-ratio: 1 / 1;
+  }
+
+  .line-total__label-full,
+  .line-total__current-word {
+    display: none;
+  }
+
+  .line-total__label-short {
+    display: inline;
+  }
+
+  .line-total__label {
+    justify-content: center;
+    gap: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .line-total__current {
+    justify-content: center;
     gap: 3px;
   }
 
   .line-total strong,
   .grid-corner span {
-    font-size: 0.86rem;
+    font-size: 0.8rem;
   }
 
-  .line-total span:last-child {
-    font-size: 0.64rem;
+  .line-total__current {
+    font-size: 0.58rem;
   }
 
   .line-total__label,
   .grid-corner small {
-    font-size: 0.54rem;
-    letter-spacing: 0.1em;
+    font-size: 0.48rem;
+    letter-spacing: 0.08em;
+  }
+
+  .board-grid[data-size="6"] .line-total,
+  .board-grid[data-size="7"] .line-total,
+  .board-grid[data-size="6"] .grid-corner,
+  .board-grid[data-size="7"] .grid-corner {
+    padding: 5px 4px;
+  }
+
+  .board-grid[data-size="6"] .line-total strong,
+  .board-grid[data-size="7"] .line-total strong,
+  .board-grid[data-size="6"] .grid-corner span,
+  .board-grid[data-size="7"] .grid-corner span {
+    font-size: 0.72rem;
+  }
+
+  .board-grid[data-size="6"] .line-total__current,
+  .board-grid[data-size="7"] .line-total__current {
+    font-size: 0.52rem;
+  }
+
+  .board-grid[data-size="6"] .line-total__label,
+  .board-grid[data-size="7"] .line-total__label,
+  .board-grid[data-size="6"] .grid-corner small,
+  .board-grid[data-size="7"] .grid-corner small {
+    font-size: 0.42rem;
   }
 
   .legend-item,
@@ -1748,14 +1858,19 @@ button {
     min-width: 82px;
   }
 
+  .board-scroll {
+    padding-bottom: 0;
+  }
+
   .board-grid {
-    gap: 6px;
+    gap: 5px;
+    grid-template-columns: repeat(var(--board-size), minmax(0, 1fr)) minmax(34px, 0.82fr);
   }
 
   .grid-cell,
   .line-total,
   .grid-corner {
-    min-height: 46px;
+    min-height: 0;
     border-radius: 12px;
   }
 
@@ -1765,16 +1880,26 @@ button {
 
   .line-total,
   .grid-corner {
-    padding: 7px;
+    padding: 5px 4px;
   }
 
   .line-total strong,
   .grid-corner span {
-    font-size: 0.8rem;
+    font-size: 0.72rem;
   }
 
-  .line-total span:last-child {
-    font-size: 0.6rem;
+  .line-total__current {
+    font-size: 0.5rem;
+  }
+
+  .line-total__label,
+  .grid-corner small {
+    font-size: 0.4rem;
+    letter-spacing: 0.06em;
+  }
+
+  .grid-corner small {
+    display: none;
   }
 
   .control-rack__row--actions {

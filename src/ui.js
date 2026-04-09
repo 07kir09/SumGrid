@@ -331,9 +331,15 @@ function renderBoard(viewModel) {
 
     content.push(`
       <div class="line-total line-total--row" data-status="${viewModel.rowStatuses[rowIndex]}">
-        <span class="line-total__label">Строка ${rowIndex + 1}</span>
+        <span class="line-total__label">
+          <span class="line-total__label-full">Строка ${rowIndex + 1}</span>
+          <span class="line-total__label-short">→ ${rowIndex + 1}</span>
+        </span>
         <strong>${viewModel.puzzle.rowTargets[rowIndex]}</strong>
-        <span>${viewModel.rowSums[rowIndex]} сейчас</span>
+        <span class="line-total__current">
+          <span class="line-total__current-value">${viewModel.rowSums[rowIndex]}</span>
+          <span class="line-total__current-word">сейчас</span>
+        </span>
       </div>
     `);
   });
@@ -341,9 +347,15 @@ function renderBoard(viewModel) {
   viewModel.puzzle.columnTargets.forEach((target, columnIndex) => {
     content.push(`
       <div class="line-total line-total--column" data-status="${viewModel.columnStatuses[columnIndex]}">
-        <span class="line-total__label">Столбец ${columnIndex + 1}</span>
+        <span class="line-total__label">
+          <span class="line-total__label-full">Столбец ${columnIndex + 1}</span>
+          <span class="line-total__label-short">↓ ${columnIndex + 1}</span>
+        </span>
         <strong>${target}</strong>
-        <span>${viewModel.columnSums[columnIndex]} сейчас</span>
+        <span class="line-total__current">
+          <span class="line-total__current-value">${viewModel.columnSums[columnIndex]}</span>
+          <span class="line-total__current-word">сейчас</span>
+        </span>
       </div>
     `);
   });
@@ -358,6 +370,7 @@ function renderBoard(viewModel) {
   return `
     <div
       class="board-grid"
+      data-size="${viewModel.size}"
       style="--board-size: ${viewModel.size}; --cell-min: ${cellMin}px; --total-min: ${totalMin}px;"
     >
       ${content.join("")}
