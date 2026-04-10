@@ -709,6 +709,16 @@ button {
   border-radius: 18px;
 }
 
+.board-overlay--victory {
+  padding: 20px;
+}
+
+.board-overlay__card--victory {
+  width: min(100%, 720px);
+  max-height: none;
+  text-align: left;
+}
+
 .board-overlay__card h3 {
   margin: 12px 0 0;
   font-size: clamp(1.24rem, 2vw, 1.68rem);

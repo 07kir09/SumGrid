@@ -133,7 +133,13 @@ export class SumGridUI {
               </div>
 
               ${
-                viewModel.boardLocked
+                viewModel.isSolved
+                  ? `
+                    <div class="board-overlay board-overlay--victory">
+                      ${renderVictoryCard(viewModel, boardCode)}
+                    </div>
+                  `
+                  : viewModel.boardLocked
                   ? `
                     <div class="board-overlay">
                       <div class="board-overlay__card board-overlay__card--compact">
@@ -232,8 +238,6 @@ export class SumGridUI {
                 ${renderActionButton("solution", viewModel.showSolutionLabel, "accent")}
               </div>
 
-              ${viewModel.isSolved ? renderVictoryCard(viewModel, boardCode) : ""}
-
               <div class="status-strip" data-tone="${viewModel.themeTone}">
                 <p class="status-strip__message">${viewModel.message}</p>
                 <div class="status-strip__stats">
@@ -328,7 +332,7 @@ function renderActionButton(action, label, variant) {
 
 function renderVictoryCard(viewModel, boardCode) {
   return `
-    <section class="victory-card" aria-live="polite">
+    <section class="board-overlay__card board-overlay__card--victory victory-card" aria-live="polite">
       <div class="victory-card__glow victory-card__glow--left" aria-hidden="true"></div>
       <div class="victory-card__glow victory-card__glow--right" aria-hidden="true"></div>
       <div class="victory-card__confetti" aria-hidden="true">
