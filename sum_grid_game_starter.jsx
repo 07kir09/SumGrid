@@ -71,6 +71,12 @@ function getStatus(current, target) {
   return "under";
 }
 
+function formatElapsedTime(totalSeconds) {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function StatPill({ label, value }) {
   return (
     <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
@@ -88,6 +94,9 @@ export default function SumGridGameStarter() {
   const [message, setMessage] = useState("Выделяй клетки так, чтобы суммы совпали с числами справа и снизу.");
   const [moves, setMoves] = useState(0);
   const [wins, setWins] = useState(0);
+  const [level, setLevel] = useState(1);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [isWinRecorded, setIsWinRecorded] = useState(false);
 
   useEffect(() => {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -101,6 +110,9 @@ export default function SumGridGameStarter() {
         setShowSolution(false);
         setMoves(saved.moves || 0);
         setWins(saved.wins || 0);
+        setLevel(saved.level || 1);
+        setElapsedSeconds(saved.elapsedSeconds || 0);
+        setIsWinRecorded(saved.isWinRecorded || false);
       }
     } catch {
       // ignore broken save
@@ -110,9 +122,9 @@ export default function SumGridGameStarter() {
   useEffect(() => {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ puzzle, marks, moves, wins })
+      JSON.stringify({ puzzle, marks, moves, wins, level, elapsedSeconds, isWinRecorded })
     );
-  }, [puzzle, marks, moves, wins]);
+  }, [puzzle, marks, moves, wins, level, elapsedSeconds, isWinRecorded]);
 
   const rowSums = useMemo(() => calcPlayerRowSums(puzzle, marks), [puzzle, marks]);
   const colSums = useMemo(() => calcPlayerColSums(puzzle, marks), [puzzle, marks]);
@@ -124,10 +136,24 @@ export default function SumGridGameStarter() {
   }, [rowSums, colSums, puzzle]);
 
   useEffect(() => {
-    if (allCorrect) {
-      setMessage("Победа! Все суммы совпали.");
+    if (allCorrect && !isWinRecorded) {
+      setWins((w) => w + 1);
+      setIsWinRecorded(true);
+      setMessage(
+        `Поздравляем! Вы прошли уровень ${level} за ${formatElapsedTime(elapsedSeconds)} и сделали ${moves} ходов.`
+      );
     }
-  }, [allCorrect]);
+  }, [allCorrect, elapsedSeconds, isWinRecorded, level, moves]);
+
+  useEffect(() => {
+    if (allCorrect) return undefined;
+
+    const timer = window.setInterval(() => {
+      setElapsedSeconds((seconds) => seconds + 1);
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [allCorrect, puzzle.id]);
 
   function newPuzzle(nextSize = size) {
     const fresh = createPuzzle(nextSize);
@@ -135,6 +161,9 @@ export default function SumGridGameStarter() {
     setMarks(buildEmptyMarks(nextSize));
     setShowSolution(false);
     setMoves(0);
+    setElapsedSeconds(0);
+    setIsWinRecorded(false);
+    setLevel((currentLevel) => currentLevel + 1);
     setMessage("Новый уровень готов.");
   }
 
@@ -142,6 +171,8 @@ export default function SumGridGameStarter() {
     setMarks(buildEmptyMarks(size));
     setShowSolution(false);
     setMoves(0);
+    setElapsedSeconds(0);
+    setIsWinRecorded(false);
     setMessage("Поле очищено.");
   }
 
@@ -157,8 +188,9 @@ export default function SumGridGameStarter() {
 
   function checkBoard() {
     if (allCorrect) {
-      setWins((w) => w + 1);
-      setMessage("Отлично! Уровень решён верно.");
+      setMessage(
+        `Поздравляем! Вы прошли уровень ${level} за ${formatElapsedTime(elapsedSeconds)} и сделали ${moves} ходов.`
+      );
       return;
     }
 
@@ -166,9 +198,6 @@ export default function SumGridGameStarter() {
     const badCols = colSums.filter((sum, i) => sum !== puzzle.colTargets[i]).length;
     setMessage(`Пока не сходится: строк ${badRows}, столбцов ${badCols}.`);
   }
-
-  const solvedCount = rowSums.filter((sum, i) => sum === puzzle.rowTargets[i]).length +
-    colSums.filter((sum, i) => sum === puzzle.colTargets[i]).length;
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.28),_transparent_30%),linear-gradient(180deg,#0b1020_0%,#0f172a_55%,#111827_100%)] text-white p-6">
@@ -189,9 +218,9 @@ export default function SumGridGameStarter() {
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatPill label="Размер" value={`${size}×${size}`} />
+            <StatPill label="Уровень" value={level} />
             <StatPill label="Ходов" value={moves} />
-            <StatPill label="Совпало" value={solvedCount} />
+            <StatPill label="Время" value={formatElapsedTime(elapsedSeconds)} />
             <StatPill label="Побед" value={wins} />
           </div>
         </motion.div>
@@ -367,6 +396,17 @@ export default function SumGridGameStarter() {
                 <div>
                   <h3 className="font-semibold">Статус партии</h3>
                   <p className="mt-2 text-sm leading-6 text-white/70">{message}</p>
+                  {allCorrect && (
+                    <div className="mt-4 rounded-2xl border border-emerald-400/30 bg-emerald-400/10 p-4 text-sm text-emerald-100">
+                      <div className="text-xs uppercase tracking-[0.2em] text-emerald-200/80">Уровень пройден</div>
+                      <div className="mt-2 text-lg font-semibold text-white">
+                        Уровень {level} закрыт. Отличная работа.
+                      </div>
+                      <div className="mt-2 leading-6 text-white/80">
+                        Время: {formatElapsedTime(elapsedSeconds)}. Ходов: {moves}. Размер поля: {size}×{size}.
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
