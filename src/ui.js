@@ -171,6 +171,8 @@ export class SumGridUI {
                   : ""
               }
 
+              ${viewModel.isSolved ? '<div class="board-victory-flash" aria-hidden="true"></div>' : ""}
+
               <div
                 class="board-scroll ${isUnlocking ? "board-scroll--unlocking" : ""}"
                 data-board-scroll
@@ -286,6 +288,11 @@ export class SumGridUI {
       return;
     }
 
+    if (action === "next-level") {
+      this.game.startNewGame();
+      return;
+    }
+
     if (action === "reset") {
       this.game.resetBoard();
       return;
@@ -324,6 +331,14 @@ function renderVictoryCard(viewModel, boardCode) {
     <section class="victory-card" aria-live="polite">
       <div class="victory-card__glow victory-card__glow--left" aria-hidden="true"></div>
       <div class="victory-card__glow victory-card__glow--right" aria-hidden="true"></div>
+      <div class="victory-card__confetti" aria-hidden="true">
+        <span class="victory-card__confetti-piece"></span>
+        <span class="victory-card__confetti-piece"></span>
+        <span class="victory-card__confetti-piece"></span>
+        <span class="victory-card__confetti-piece"></span>
+        <span class="victory-card__confetti-piece"></span>
+        <span class="victory-card__confetti-piece"></span>
+      </div>
 
       <div class="victory-card__header">
         <div>
@@ -350,6 +365,12 @@ function renderVictoryCard(viewModel, boardCode) {
           <span>Победы</span>
           <strong>${viewModel.totalWins}</strong>
         </div>
+      </div>
+
+      <div class="victory-card__actions">
+        <button type="button" class="action-button action-button--primary" data-action="next-level">
+          Следующий уровень
+        </button>
       </div>
     </section>
   `;
