@@ -842,6 +842,149 @@ button {
   backdrop-filter: blur(14px);
 }
 
+.victory-card {
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border: 1px solid rgba(107, 232, 214, 0.28);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top left, rgba(107, 232, 214, 0.18), transparent 36%),
+    radial-gradient(circle at top right, rgba(245, 158, 11, 0.16), transparent 28%),
+    linear-gradient(145deg, rgba(11, 33, 45, 0.96), rgba(14, 51, 44, 0.92));
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 1px rgba(107, 232, 214, 0.08);
+  animation: victory-card-enter 620ms cubic-bezier(0.2, 0.9, 0.2, 1) both;
+}
+
+.victory-card__glow {
+  position: absolute;
+  width: 160px;
+  height: 160px;
+  border-radius: 999px;
+  filter: blur(10px);
+  opacity: 0.65;
+  animation: victory-glow 3.2s ease-in-out infinite;
+}
+
+.victory-card__glow--left {
+  top: -44px;
+  left: -34px;
+  background: rgba(107, 232, 214, 0.24);
+}
+
+.victory-card__glow--right {
+  top: -28px;
+  right: -42px;
+  background: rgba(245, 158, 11, 0.22);
+  animation-delay: 0.45s;
+}
+
+.victory-card__header,
+.victory-card__stats {
+  position: relative;
+  z-index: 1;
+}
+
+.victory-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.victory-card__title {
+  margin: 6px 0 0;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1;
+  color: var(--text-strong);
+}
+
+.victory-card__text {
+  margin: 12px 0 0;
+  max-width: 42ch;
+  color: rgba(233, 241, 248, 0.84);
+}
+
+.victory-card__text strong {
+  color: var(--text-strong);
+}
+
+.victory-card__badge {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f8fafc;
+}
+
+.victory-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.victory-stat {
+  padding: 14px 16px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.victory-stat span {
+  display: block;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(214, 226, 240, 0.66);
+}
+
+.victory-stat strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1.4rem;
+  color: var(--text-strong);
+}
+
+@keyframes victory-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.97);
+  }
+
+  60% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.01);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes victory-glow {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.4;
+  }
+
+  50% {
+    transform: scale(1.14);
+    opacity: 0.82;
+  }
+}
+
 .grid-cell,
 .line-total,
 .grid-corner {
@@ -1297,6 +1440,14 @@ button {
 
   .status-panel {
     grid-column: 1 / -1;
+  }
+
+  .victory-card__header {
+    flex-direction: column;
+  }
+
+  .victory-card__stats {
+    grid-template-columns: 1fr;
   }
 }
 

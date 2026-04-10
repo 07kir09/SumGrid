@@ -483,7 +483,7 @@ export class SumGridGame {
       this.state.hasRecordedWin = true;
     }
 
-    this.state.message = `Решено за ${formatDuration(
+    this.state.message = `Поздравляем! Раунд пройден за ${formatDuration(
       this.state.elapsedMs
     )} и ${this.state.moves} ${pluralizeRu(
       this.state.moves,

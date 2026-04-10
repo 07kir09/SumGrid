@@ -230,6 +230,8 @@ export class SumGridUI {
                 ${renderActionButton("solution", viewModel.showSolutionLabel, "accent")}
               </div>
 
+              ${viewModel.isSolved ? renderVictoryCard(viewModel, boardCode) : ""}
+
               <div class="status-strip" data-tone="${viewModel.themeTone}">
                 <p class="status-strip__message">${viewModel.message}</p>
                 <div class="status-strip__stats">
@@ -314,6 +316,42 @@ function renderActionButton(action, label, variant) {
     <button type="button" class="action-button action-button--${variant}" data-action="${action}">
       ${label}
     </button>
+  `;
+}
+
+function renderVictoryCard(viewModel, boardCode) {
+  return `
+    <section class="victory-card" aria-live="polite">
+      <div class="victory-card__glow victory-card__glow--left" aria-hidden="true"></div>
+      <div class="victory-card__glow victory-card__glow--right" aria-hidden="true"></div>
+
+      <div class="victory-card__header">
+        <div>
+          <div class="section-label">Поздравляем</div>
+          <h3 class="victory-card__title">Уровень пройден</h3>
+          <p class="victory-card__text">
+            Вы закрыли раунд <strong>#${boardCode}</strong> в режиме
+            <strong>${viewModel.difficulty.label}</strong>. Отличная работа.
+          </p>
+        </div>
+        <div class="victory-card__badge">Готово</div>
+      </div>
+
+      <div class="victory-card__stats">
+        <div class="victory-stat">
+          <span>Время</span>
+          <strong>${viewModel.elapsedLabel}</strong>
+        </div>
+        <div class="victory-stat">
+          <span>Ходы</span>
+          <strong>${viewModel.moves}</strong>
+        </div>
+        <div class="victory-stat">
+          <span>Победы</span>
+          <strong>${viewModel.totalWins}</strong>
+        </div>
+      </div>
+    </section>
   `;
 }
 
