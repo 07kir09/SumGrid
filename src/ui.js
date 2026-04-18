@@ -1,5 +1,7 @@
 import { CELL_STATES } from "./constants.js";
 
+const numberFormatter = new Intl.NumberFormat("ru-RU");
+
 export class SumGridUI {
   constructor({ root, game }) {
     this.root = root;
@@ -45,6 +47,18 @@ export class SumGridUI {
         this.game.setDifficulty(difficultyElement.dataset.difficulty);
       }
     });
+
+    this.root.addEventListener("change", (event) => {
+      const target = event.target;
+
+      if (!(target instanceof HTMLInputElement)) {
+        return;
+      }
+
+      if (target.matches("[data-player-name]")) {
+        this.game.setPlayerName(target.value);
+      }
+    });
   }
 
   render(viewModel) {
@@ -82,7 +96,8 @@ export class SumGridUI {
             ${renderMetric("Режим", viewModel.difficulty.label)}
             ${renderMetric("Раунд", `#${boardCode}`)}
             ${renderMetric("Время", viewModel.elapsedLabel, "timer")}
-            ${renderMetric("Победы", String(viewModel.totalWins))}
+            ${renderMetric("Очки", formatNumber(viewModel.currentPlayer.totalScore))}
+            ${renderMetric("Место", viewModel.currentPlayer.rank ? `#${viewModel.currentPlayer.rank}` : "—")}
           </div>
         </header>
 
@@ -93,7 +108,7 @@ export class SumGridUI {
                 <div class="section-label">Игровое поле</div>
                 <h2 class="board-stage__title">Пусто → выбрано → зачеркнуто</h2>
                 <p class="board-stage__hint">
-                  Выбранные клетки входят в сумму. Цели справа и снизу должны совпасть.
+                  Подсказка подсветит одну нужную клетку, но снизит итоговый результат.
                 </p>
               </div>
 
@@ -103,6 +118,7 @@ export class SumGridUI {
                 </span>
                 <span class="chip">${viewModel.selectionCount} выбрано</span>
                 <span class="chip">цель ${viewModel.grandTarget}</span>
+                <span class="chip">подсказки ${viewModel.hintsUsed}</span>
               </div>
             </div>
 
@@ -146,7 +162,7 @@ export class SumGridUI {
                         <div class="section-label">Раунд не начат</div>
                         <h3>${viewModel.startButtonLabel}</h3>
                         <p class="board-overlay__intro">
-                          Если хотите продолжить, нажмите кнопку ниже или откройте правила игры.
+                          Если хочешь продолжить, нажми кнопку ниже или открой правила игры.
                         </p>
                         <button type="button" class="action-button action-button--primary board-overlay__button board-overlay__button--compact" data-action="start">
                           ${viewModel.startButtonLabel}
@@ -161,8 +177,9 @@ export class SumGridUI {
                             <p>5. В расчёт суммы входят только выбранные клетки. Зачеркнутые клетки исключаются.</p>
                             <p>6. Если сумма линии равна цели, она верна. Если больше цели, линия превышена. Если меньше, она ещё не собрана.</p>
                             <p>7. Победа засчитывается только тогда, когда все строки и все столбцы одновременно точно совпадают с целями.</p>
-                            <p>8. «Проверить» оценивает текущее решение, «Сброс» очищает отметки, «Показать решение» открывает правильный узор.</p>
-                            <p>9. Таймер запускается только после нажатия на «Начать игру» или «Продолжить игру».</p>
+                            <p>8. Кнопка «Дать подсказку» открывает одну нужную клетку и фиксирует её на поле.</p>
+                            <p>9. Подсказки снижают итоговые очки, поэтому лучший рейтинг собирается без них или с минимальным числом.</p>
+                            <p>10. Таймер запускается только после нажатия на «Начать игру» или «Продолжить игру».</p>
                           </div>
                         </details>
                       </div>
@@ -231,18 +248,67 @@ export class SumGridUI {
                 </div>
               </div>
 
+              <div class="control-rack__row control-rack__row--profile">
+                <div class="control-group">
+                  <div class="section-label">Игрок</div>
+                  <label class="text-field">
+                    <span class="text-field__label">Имя в рейтинге</span>
+                    <input
+                      type="text"
+                      maxlength="24"
+                      class="text-field__input"
+                      data-player-name
+                      value="${escapeHtml(viewModel.playerName)}"
+                    />
+                  </label>
+
+                  <div class="profile-stats">
+                    ${renderProfileStat("Очки", formatNumber(viewModel.currentPlayer.totalScore))}
+                    ${renderProfileStat("Победы", String(viewModel.currentPlayer.wins))}
+                    ${renderProfileStat("Лучший", formatNumber(viewModel.currentPlayer.bestScore))}
+                    ${renderProfileStat(
+                      "Место",
+                      viewModel.currentPlayer.rank ? `#${viewModel.currentPlayer.rank}` : "—"
+                    )}
+                  </div>
+
+                  <p class="control-group__hint">
+                    Очки зависят от сложности, размера поля, времени, лишних ходов и числа подсказок.
+                  </p>
+                </div>
+
+                <div class="control-group control-group--leaderboard">
+                  <div class="leaderboard__header">
+                    <div>
+                      <div class="section-label">Рейтинг</div>
+                      <strong class="leaderboard__title">Общий рейтинг игроков</strong>
+                    </div>
+                    <span class="chip">${
+                      viewModel.isLeaderboardLoading
+                        ? "синхронизация"
+                        : `${viewModel.leaderboard.length || 0} в топе`
+                    }</span>
+                  </div>
+                  ${renderLeaderboard(viewModel)}
+                </div>
+              </div>
+
               <div class="control-rack__row control-rack__row--actions">
                 ${renderActionButton("new-game", "Новая игра", "primary")}
                 ${renderActionButton("reset", "Сброс", "ghost")}
-                ${renderActionButton("check", "Проверить", "success")}
-                ${renderActionButton("solution", viewModel.showSolutionLabel, "accent")}
+                ${renderActionButton(
+                  "hint",
+                  viewModel.remainingHints > 0 ? "Дать подсказку" : "Подсказок нет",
+                  "accent",
+                  viewModel.boardLocked || viewModel.isSolved || viewModel.remainingHints === 0
+                )}
               </div>
 
               <div class="status-strip" data-tone="${viewModel.themeTone}">
                 <p class="status-strip__message">${viewModel.message}</p>
                 <div class="status-strip__stats">
                   <span class="status-pill"><b>Ходы</b>${viewModel.moves}</span>
-                  <span class="status-pill"><b>Проверки</b>${viewModel.checks}</span>
+                  <span class="status-pill"><b>Подсказки</b>${viewModel.hintsUsed}</span>
                   <span class="status-pill"><b>Превышено</b>${viewModel.exceededLines}</span>
                   <span class="status-pill"><b>Не собрано</b>${viewModel.incompleteLines}</span>
                 </div>
@@ -302,13 +368,8 @@ export class SumGridUI {
       return;
     }
 
-    if (action === "check") {
-      this.game.checkBoard();
-      return;
-    }
-
-    if (action === "solution") {
-      this.game.toggleSolution();
+    if (action === "hint") {
+      this.game.useHint();
     }
   }
 }
@@ -322,15 +383,22 @@ function renderMetric(label, value, role = "") {
   `;
 }
 
-function renderActionButton(action, label, variant) {
+function renderActionButton(action, label, variant, disabled = false) {
   return `
-    <button type="button" class="action-button action-button--${variant}" data-action="${action}">
+    <button
+      type="button"
+      class="action-button action-button--${variant}"
+      data-action="${action}"
+      ${disabled ? "disabled" : ""}
+    >
       ${label}
     </button>
   `;
 }
 
 function renderVictoryCard(viewModel, boardCode) {
+  const breakdown = viewModel.roundScoreBreakdown;
+
   return `
     <section class="board-overlay__card board-overlay__card--victory victory-card" aria-live="polite">
       <div class="victory-card__glow victory-card__glow--left" aria-hidden="true"></div>
@@ -349,14 +417,18 @@ function renderVictoryCard(viewModel, boardCode) {
           <div class="section-label">Поздравляем</div>
           <h3 class="victory-card__title">Уровень пройден</h3>
           <p class="victory-card__text">
-            Вы закрыли раунд <strong>#${boardCode}</strong> в режиме
-            <strong>${viewModel.difficulty.label}</strong>. Отличная работа.
+            Игрок <strong>${escapeHtml(viewModel.playerName)}</strong> закрыл раунд <strong>#${boardCode}</strong>
+            в режиме <strong>${viewModel.difficulty.label}</strong>.
           </p>
         </div>
         <div class="victory-card__badge">Готово</div>
       </div>
 
-      <div class="victory-card__stats">
+      <div class="victory-card__stats victory-card__stats--wide">
+        <div class="victory-stat">
+          <span>Очки</span>
+          <strong>${formatNumber(viewModel.roundScore ?? 0)}</strong>
+        </div>
         <div class="victory-stat">
           <span>Время</span>
           <strong>${viewModel.elapsedLabel}</strong>
@@ -366,10 +438,23 @@ function renderVictoryCard(viewModel, boardCode) {
           <strong>${viewModel.moves}</strong>
         </div>
         <div class="victory-stat">
-          <span>Победы</span>
-          <strong>${viewModel.totalWins}</strong>
+          <span>Подсказки</span>
+          <strong>${viewModel.hintsUsed}</strong>
         </div>
       </div>
+
+      ${
+        breakdown
+          ? `
+            <div class="victory-card__scoreline">
+              <span>База ${formatNumber(breakdown.baseScore)}</span>
+              <span>${formatSignedNumber(breakdown.timeAdjustment)} за темп</span>
+              <span>−${formatNumber(breakdown.movePenalty)} за лишние ходы</span>
+              <span>−${formatNumber(breakdown.hintPenalty)} за подсказки</span>
+            </div>
+          `
+          : ""
+      }
 
       <div class="victory-card__actions">
         <button type="button" class="action-button action-button--primary" data-action="next-level">
@@ -389,7 +474,7 @@ function renderBoard(viewModel) {
   viewModel.puzzle.numbers.forEach((row, rowIndex) => {
     row.forEach((value, columnIndex) => {
       const cellState = viewModel.marks[rowIndex][columnIndex];
-      const isSolutionCell = viewModel.puzzle.solution[rowIndex][columnIndex];
+      const isHintedCell = viewModel.hintCells[rowIndex][columnIndex];
 
       content.push(`
         <button
@@ -399,15 +484,16 @@ function renderBoard(viewModel) {
           data-row="${rowIndex}"
           data-column="${columnIndex}"
           data-state="${getCellStateName(cellState)}"
-          data-solution="${isSolutionCell}"
-          data-show-solution="${viewModel.showSolution}"
-          ${viewModel.isSolved || viewModel.boardLocked ? "disabled" : ""}
-          aria-label="Строка ${rowIndex + 1}, столбец ${columnIndex + 1}, значение ${value}"
+          data-hinted="${isHintedCell}"
+          ${viewModel.isSolved || viewModel.boardLocked || isHintedCell ? "disabled" : ""}
+          aria-label="Строка ${rowIndex + 1}, столбец ${columnIndex + 1}, значение ${value}${
+            isHintedCell ? ", подсказка" : ""
+          }"
           aria-pressed="${cellState === CELL_STATES.SELECTED}"
         >
           <span class="cell__value">${value}</span>
           <span class="cell__cross">×</span>
-          <span class="cell__solution-pill">цель</span>
+          <span class="cell__hint-pill">подсказка</span>
         </button>
       `);
     });
@@ -461,6 +547,69 @@ function renderBoard(viewModel) {
   `;
 }
 
+function renderLeaderboard(viewModel) {
+  if (viewModel.isLeaderboardLoading && !viewModel.leaderboard.length) {
+    return `
+      <div class="leaderboard leaderboard--empty">
+        <p class="leaderboard__empty">Загружаем общий рейтинг игроков...</p>
+      </div>
+    `;
+  }
+
+  if (viewModel.leaderboardError && !viewModel.leaderboard.length) {
+    return `
+      <div class="leaderboard leaderboard--empty">
+        <p class="leaderboard__empty">${escapeHtml(viewModel.leaderboardError)}</p>
+      </div>
+    `;
+  }
+
+  if (!viewModel.leaderboard.length) {
+    return `
+      <div class="leaderboard leaderboard--empty">
+        <p class="leaderboard__empty">Пока нет завершённых раундов. Первый результат появится после победы.</p>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="leaderboard">
+      ${viewModel.leaderboard
+        .map((entry) => {
+          const isCurrent =
+            entry.playerName.toLocaleLowerCase("ru-RU") ===
+            viewModel.playerName.toLocaleLowerCase("ru-RU");
+
+          return `
+            <div class="leaderboard__row ${isCurrent ? "is-current" : ""}">
+              <div class="leaderboard__position">#${entry.rank}</div>
+              <div class="leaderboard__meta">
+                <strong>${escapeHtml(entry.playerName)}</strong>
+                <span>${entry.wins} побед · лучший раунд ${formatNumber(entry.bestScore)}</span>
+              </div>
+              <div class="leaderboard__score">${formatNumber(entry.totalScore)}</div>
+            </div>
+          `;
+        })
+        .join("")}
+      ${
+        viewModel.leaderboardError
+          ? `<p class="leaderboard__status">${escapeHtml(viewModel.leaderboardError)}</p>`
+          : ""
+      }
+    </div>
+  `;
+}
+
+function renderProfileStat(label, value) {
+  return `
+    <div class="profile-stat">
+      <span>${label}</span>
+      <strong>${value}</strong>
+    </div>
+  `;
+}
+
 function getCellStateName(state) {
   if (state === CELL_STATES.SELECTED) {
     return "selected";
@@ -471,4 +620,26 @@ function getCellStateName(state) {
   }
 
   return "empty";
+}
+
+function formatNumber(value) {
+  return numberFormatter.format(Number.isFinite(value) ? value : 0);
+}
+
+function formatSignedNumber(value) {
+  if (!Number.isFinite(value) || value === 0) {
+    return "0";
+  }
+
+  const sign = value > 0 ? "+" : "−";
+  return `${sign}${formatNumber(Math.abs(value))}`;
+}
+
+function escapeHtml(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }

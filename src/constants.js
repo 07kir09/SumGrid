@@ -3,6 +3,7 @@ export const STORAGE_KEY = "sum-grid-browser-v1";
 export const BOARD_SIZES = [4, 5, 6, 7];
 export const DEFAULT_SIZE = 5;
 export const DEFAULT_DIFFICULTY = "classic";
+export const DEFAULT_PLAYER_NAME = "Игрок";
 
 export const CELL_STATES = {
   EMPTY: 0,

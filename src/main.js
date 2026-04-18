@@ -9,6 +9,8 @@ game.subscribe((viewModel) => {
   ui.render(viewModel);
 });
 
+void game.initialize();
+
 window.setInterval(() => {
   const elapsedLabel = game.tick();
 

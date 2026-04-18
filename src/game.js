@@ -2,9 +2,11 @@ import {
   BOARD_SIZES,
   CELL_STATES,
   DEFAULT_DIFFICULTY,
+  DEFAULT_PLAYER_NAME,
   DEFAULT_SIZE,
   DIFFICULTIES,
 } from "./constants.js";
+import { fetchLeaderboard, submitResult } from "./api.js";
 import {
   buildEmptyMarks,
   calculateColumnSums,
@@ -13,15 +15,18 @@ import {
   getLineStatus,
   summarizeTargets,
 } from "./generator.js";
+import { calculateRoundScore, normalizePlayerName } from "./scoring.js";
 import { loadPersistedState, savePersistedState } from "./storage.js";
-import { cloneMatrix, formatDuration, pluralizeRu } from "./utils.js";
+import { cloneMatrix, createMatrix, formatDuration, pluralizeRu } from "./utils.js";
 
 const DEFAULT_MESSAGE =
   "Отмечай клетки так, чтобы суммы в строках и столбцах совпали с целями по краям.";
+const LEADERBOARD_LIMIT = 8;
 
 export class SumGridGame {
   constructor() {
     this.listeners = new Set();
+    this.isSyncingResults = false;
     this.state = this.createBaseState();
 
     const restored = this.restore();
@@ -45,6 +50,15 @@ export class SumGridGame {
     };
   }
 
+  async initialize() {
+    if (this.state.pendingResults.length > 0) {
+      await this.flushPendingResults();
+      return;
+    }
+
+    await this.refreshLeaderboard({ silent: true });
+  }
+
   startNewGame({
     size = this.state.size,
     difficultyId = this.state.difficultyId,
@@ -62,12 +76,13 @@ export class SumGridGame {
       difficultyId: nextDifficulty,
       puzzle,
       marks: buildEmptyMarks(nextSize),
-      showSolution: false,
+      hintCells: buildHintMatrix(nextSize),
       isSolved: false,
       isRoundStarted: false,
       hasRecordedWin: false,
       moves: 0,
       checks: 0,
+      hintsUsed: 0,
       elapsedMs: 0,
       timerBaseMs: null,
       message: announce
@@ -79,6 +94,20 @@ export class SumGridGame {
 
     this.persist();
     this.emit();
+  }
+
+  setPlayerName(name) {
+    const nextName = normalizePlayerName(name);
+
+    if (nextName === this.state.playerName) {
+      return;
+    }
+
+    this.state.playerName = nextName;
+    this.state.currentPlayer = createEmptyPlayerStats(nextName);
+    this.persist();
+    this.emit();
+    void this.refreshLeaderboard({ silent: true });
   }
 
   setSize(size) {
@@ -103,12 +132,13 @@ export class SumGridGame {
     }
 
     this.state.marks = buildEmptyMarks(this.state.size);
-    this.state.showSolution = false;
+    this.state.hintCells = buildHintMatrix(this.state.size);
     this.state.isSolved = false;
     this.state.isRoundStarted = false;
     this.state.hasRecordedWin = false;
     this.state.moves = 0;
     this.state.checks = 0;
+    this.state.hintsUsed = 0;
     this.state.elapsedMs = 0;
     this.state.timerBaseMs = null;
     this.state.message = "Поле сброшено. Нажми «Начать игру», когда будешь готов.";
@@ -160,9 +190,12 @@ export class SumGridGame {
       return;
     }
 
+    if (this.state.hintCells[rowIndex]?.[columnIndex]) {
+      return;
+    }
+
     const nextMarks = cloneMatrix(this.state.marks);
-    nextMarks[rowIndex][columnIndex] =
-      (nextMarks[rowIndex][columnIndex] + 1) % 3;
+    nextMarks[rowIndex][columnIndex] = (nextMarks[rowIndex][columnIndex] + 1) % 3;
 
     this.state.marks = nextMarks;
     this.state.moves += 1;
@@ -186,7 +219,7 @@ export class SumGridGame {
     this.emit();
   }
 
-  checkBoard() {
+  useHint() {
     if (!this.state.puzzle) {
       return;
     }
@@ -198,49 +231,34 @@ export class SumGridGame {
       return;
     }
 
-    this.state.checks += 1;
+    const hintedCell = this.pickHintCell();
+
+    if (!hintedCell) {
+      this.state.message = "Все нужные клетки уже подсвечены. Дальше только логика.";
+      this.persist();
+      this.emit();
+      return;
+    }
+
+    const nextMarks = cloneMatrix(this.state.marks);
+    const nextHintCells = cloneMatrix(this.state.hintCells);
+
+    nextMarks[hintedCell.rowIndex][hintedCell.columnIndex] = CELL_STATES.SELECTED;
+    nextHintCells[hintedCell.rowIndex][hintedCell.columnIndex] = true;
+
+    this.state.marks = nextMarks;
+    this.state.hintCells = nextHintCells;
+    this.state.hintsUsed += 1;
+    this.state.message = `Подсказка дала нужную клетку: строка ${
+      hintedCell.rowIndex + 1
+    }, столбец ${hintedCell.columnIndex + 1}. Эта клетка уже входит в решение.`;
+
     const derived = this.getDerivedState();
 
     if (derived.allCorrect) {
       this.completePuzzle();
       return;
     }
-
-    const incorrectLines = derived.totalLines - derived.correctLines;
-
-    if (derived.exceededLines > 0) {
-      this.state.message = `Цель превышена в ${derived.exceededLines} ${pluralizeRu(
-        derived.exceededLines,
-        "линии",
-        "линиях",
-        "линиях"
-      )}.`;
-    } else {
-      this.state.message = `${incorrectLines} ${pluralizeRu(
-        incorrectLines,
-        "линия ещё не совпадает.",
-        "линии ещё не совпадают.",
-        "линий ещё не совпадают."
-      )}`;
-    }
-
-    this.persist();
-    this.emit();
-  }
-
-  toggleSolution() {
-    if (!this.state.isRoundStarted && !this.state.isSolved) {
-      this.state.message =
-        "Сначала начни игру, а потом при необходимости открой решение.";
-      this.persist();
-      this.emit();
-      return;
-    }
-
-    this.state.showSolution = !this.state.showSolution;
-    this.state.message = this.state.showSolution
-      ? "Подсветка решения включена. Целевые клетки отмечены."
-      : "Подсветка решения скрыта. Снова только логика.";
 
     this.persist();
     this.emit();
@@ -277,10 +295,40 @@ export class SumGridGame {
     this.emit();
   }
 
+  async refreshLeaderboard({ silent = false } = {}) {
+    if (this.isSyncingResults) {
+      return;
+    }
+
+    if (!silent) {
+      this.state.isLeaderboardLoading = true;
+      this.state.leaderboardError = "";
+      this.emit();
+    } else {
+      this.state.isLeaderboardLoading = true;
+    }
+
+    try {
+      const payload = await fetchLeaderboard({
+        playerName: this.state.playerName,
+        limit: LEADERBOARD_LIMIT,
+      });
+
+      this.applyLeaderboardResponse(payload);
+    } catch (error) {
+      this.state.leaderboardError =
+        error instanceof Error ? error.message : "Не удалось загрузить общий рейтинг.";
+    } finally {
+      this.state.isLeaderboardLoading = false;
+      this.emit();
+    }
+  }
+
   getViewModel() {
     const derived = this.getDerivedState();
     const difficulty = DIFFICULTIES[this.state.difficultyId];
     const totals = summarizeTargets(this.state.puzzle);
+    const roundScore = this.state.isSolved ? this.getRoundScore() : null;
 
     return {
       ...this.state,
@@ -309,9 +357,9 @@ export class SumGridGame {
         : derived.exceededLines > 0
         ? "warning"
         : "neutral",
-      showSolutionLabel: this.state.showSolution
-        ? "Скрыть решение"
-        : "Показать решение",
+      remainingHints: this.getAvailableHintCells().length,
+      roundScore: roundScore?.score ?? null,
+      roundScoreBreakdown: roundScore?.breakdown ?? null,
     };
   }
 
@@ -319,18 +367,25 @@ export class SumGridGame {
     return {
       size: DEFAULT_SIZE,
       difficultyId: DEFAULT_DIFFICULTY,
+      playerName: DEFAULT_PLAYER_NAME,
       puzzle: null,
       marks: buildEmptyMarks(DEFAULT_SIZE),
-      showSolution: false,
+      hintCells: buildHintMatrix(DEFAULT_SIZE),
       isSolved: false,
       isRoundStarted: false,
       hasRecordedWin: false,
       totalWins: 0,
       moves: 0,
       checks: 0,
+      hintsUsed: 0,
       elapsedMs: 0,
       timerBaseMs: null,
       message: DEFAULT_MESSAGE,
+      leaderboard: [],
+      currentPlayer: createEmptyPlayerStats(DEFAULT_PLAYER_NAME),
+      isLeaderboardLoading: false,
+      leaderboardError: "",
+      pendingResults: [],
     };
   }
 
@@ -417,9 +472,13 @@ export class SumGridGame {
       return null;
     }
 
+    const playerName = normalizePlayerName(saved?.playerName);
     const marks = isMarksMatrix(saved?.marks, size)
       ? saved.marks
       : buildEmptyMarks(size);
+    const hintCells = isBooleanMatrix(saved?.hintCells, size)
+      ? saved.hintCells
+      : buildHintMatrix(size);
     const elapsedMs = Number.isFinite(saved?.elapsedMs)
       ? Math.max(0, saved.elapsedMs)
       : 0;
@@ -429,15 +488,17 @@ export class SumGridGame {
     return {
       size,
       difficultyId,
+      playerName,
       puzzle,
       marks,
-      showSolution: Boolean(saved?.showSolution),
+      hintCells,
       isSolved,
       isRoundStarted,
       hasRecordedWin: isSolved ? Boolean(saved?.hasRecordedWin) : false,
       totalWins: Number.isFinite(saved?.totalWins) ? Math.max(0, saved.totalWins) : 0,
       moves: Number.isFinite(saved?.moves) ? Math.max(0, saved.moves) : 0,
       checks: Number.isFinite(saved?.checks) ? Math.max(0, saved.checks) : 0,
+      hintsUsed: Number.isFinite(saved?.hintsUsed) ? Math.max(0, saved.hintsUsed) : 0,
       elapsedMs,
       timerBaseMs: isSolved || !isRoundStarted
         ? null
@@ -453,6 +514,11 @@ export class SumGridGame {
           ? saved.message
           : DEFAULT_MESSAGE
         : "Поле готово. Нажми «Начать игру».",
+      leaderboard: [],
+      currentPlayer: createEmptyPlayerStats(playerName),
+      isLeaderboardLoading: false,
+      leaderboardError: "",
+      pendingResults: normalizePendingResults(saved?.pendingResults),
     };
   }
 
@@ -478,22 +544,29 @@ export class SumGridGame {
     this.state.isSolved = true;
     this.state.isRoundStarted = false;
 
+    const roundScore = this.getRoundScore();
+
     if (!this.state.hasRecordedWin) {
       this.state.totalWins += 1;
       this.state.hasRecordedWin = true;
+      this.state.pendingResults = [
+        ...this.state.pendingResults,
+        this.createResultPayload(),
+      ];
     }
 
     this.state.message = `Поздравляем! Раунд пройден за ${formatDuration(
       this.state.elapsedMs
-    )} и ${this.state.moves} ${pluralizeRu(
-      this.state.moves,
-      "ход",
-      "хода",
-      "ходов"
-    )}.`;
+    )}, использовано ${this.state.hintsUsed} ${pluralizeRu(
+      this.state.hintsUsed,
+      "подсказка",
+      "подсказки",
+      "подсказок"
+    )}, начислено ${roundScore.score} очков.`;
 
     this.persist();
     this.emit();
+    void this.flushPendingResults();
   }
 
   getElapsedMs() {
@@ -509,6 +582,10 @@ export class SumGridGame {
       ...this.state,
       elapsedMs: this.getElapsedMs(),
       timerBaseMs: this.state.isSolved ? null : this.state.timerBaseMs,
+      leaderboard: [],
+      currentPlayer: createEmptyPlayerStats(this.state.playerName),
+      isLeaderboardLoading: false,
+      leaderboardError: "",
     };
 
     savePersistedState(snapshot);
@@ -518,6 +595,215 @@ export class SumGridGame {
     const viewModel = this.getViewModel();
     this.listeners.forEach((listener) => listener(viewModel));
   }
+
+  getAvailableHintCells() {
+    if (!this.state.puzzle) {
+      return [];
+    }
+
+    const derived = this.getDerivedState();
+    const candidates = [];
+
+    this.state.puzzle.solution.forEach((row, rowIndex) => {
+      row.forEach((isSolutionCell, columnIndex) => {
+        if (
+          !isSolutionCell ||
+          this.state.hintCells[rowIndex][columnIndex] ||
+          this.state.marks[rowIndex][columnIndex] === CELL_STATES.SELECTED
+        ) {
+          return;
+        }
+
+        const priority =
+          (derived.rowStatuses[rowIndex] !== "correct" ? 1 : 0) +
+          (derived.columnStatuses[columnIndex] !== "correct" ? 1 : 0);
+
+        candidates.push({ rowIndex, columnIndex, priority });
+      });
+    });
+
+    return candidates.sort((left, right) => right.priority - left.priority);
+  }
+
+  pickHintCell() {
+    return this.getAvailableHintCells()[0] ?? null;
+  }
+
+  getRoundScore() {
+    return calculateRoundScore({
+      size: this.state.size,
+      difficultyId: this.state.difficultyId,
+      elapsedMs: this.state.elapsedMs,
+      moves: this.state.moves,
+      checks: this.state.checks,
+      hintsUsed: this.state.hintsUsed,
+      solutionRevealCount: 0,
+    });
+  }
+
+  createResultPayload() {
+    return {
+      playerName: this.state.playerName,
+      size: this.state.size,
+      difficultyId: this.state.difficultyId,
+      moves: this.state.moves,
+      checks: this.state.checks,
+      hintsUsed: this.state.hintsUsed,
+      solutionRevealCount: 0,
+      elapsedMs: this.state.elapsedMs,
+      boardId: this.state.puzzle?.id,
+      createdAt: new Date().toISOString(),
+    };
+  }
+
+  async flushPendingResults() {
+    if (this.isSyncingResults || this.state.pendingResults.length === 0) {
+      return;
+    }
+
+    this.isSyncingResults = true;
+    this.state.isLeaderboardLoading = true;
+    this.state.leaderboardError = "";
+    this.emit();
+
+    try {
+      while (this.state.pendingResults.length > 0) {
+        const nextResult = this.state.pendingResults[0];
+        const payload = await submitResult(nextResult, {
+          viewerName: this.state.playerName,
+          limit: LEADERBOARD_LIMIT,
+        });
+
+        this.state.pendingResults = this.state.pendingResults.slice(1);
+        this.applyLeaderboardResponse(payload);
+        this.persist();
+        this.emit();
+      }
+    } catch (error) {
+      this.state.leaderboardError =
+        error instanceof Error ? error.message : "Не удалось обновить общий рейтинг.";
+    } finally {
+      this.isSyncingResults = false;
+      this.state.isLeaderboardLoading = false;
+      this.persist();
+      this.emit();
+    }
+  }
+
+  applyLeaderboardResponse(payload) {
+    this.state.leaderboard = normalizeRemoteLeaderboard(payload?.leaderboard);
+    this.state.currentPlayer = normalizeRemotePlayer(
+      payload?.currentPlayer,
+      this.state.playerName
+    );
+    this.state.leaderboardError = "";
+  }
+}
+
+function buildHintMatrix(size) {
+  return createMatrix(size, false);
+}
+
+function createEmptyPlayerStats(playerName) {
+  return {
+    playerName: normalizePlayerName(playerName),
+    totalScore: 0,
+    wins: 0,
+    bestScore: 0,
+    averageScore: 0,
+    rank: null,
+    lastPlayedAt: null,
+  };
+}
+
+function normalizePendingResults(entries) {
+  if (!Array.isArray(entries)) {
+    return [];
+  }
+
+  return entries
+    .map((entry) => normalizePendingResult(entry))
+    .filter(Boolean)
+    .slice(0, 20);
+}
+
+function normalizePendingResult(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const size = BOARD_SIZES.includes(entry.size) ? entry.size : null;
+  const difficultyId = DIFFICULTIES[entry.difficultyId] ? entry.difficultyId : null;
+
+  if (!size || !difficultyId) {
+    return null;
+  }
+
+  return {
+    playerName: normalizePlayerName(entry.playerName),
+    size,
+    difficultyId,
+    moves: Number.isFinite(entry.moves) ? Math.max(0, entry.moves) : 0,
+    checks: Number.isFinite(entry.checks) ? Math.max(0, entry.checks) : 0,
+    hintsUsed: Number.isFinite(entry.hintsUsed) ? Math.max(0, entry.hintsUsed) : 0,
+    solutionRevealCount: 0,
+    elapsedMs: Number.isFinite(entry.elapsedMs) ? Math.max(0, entry.elapsedMs) : 0,
+    boardId: typeof entry.boardId === "string" ? entry.boardId : "unknown-board",
+    createdAt:
+      typeof entry.createdAt === "string" && Number.isFinite(Date.parse(entry.createdAt))
+        ? new Date(entry.createdAt).toISOString()
+        : new Date().toISOString(),
+  };
+}
+
+function normalizeRemoteLeaderboard(leaderboard) {
+  if (!Array.isArray(leaderboard)) {
+    return [];
+  }
+
+  return leaderboard
+    .map((entry, index) => normalizeRemoteLeaderboardEntry(entry, index))
+    .filter(Boolean);
+}
+
+function normalizeRemoteLeaderboardEntry(entry, index) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  return {
+    rank: Number.isFinite(entry.rank) ? entry.rank : index + 1,
+    playerName: normalizePlayerName(entry.playerName),
+    totalScore: Number.isFinite(entry.totalScore) ? Math.max(0, entry.totalScore) : 0,
+    wins: Number.isFinite(entry.wins) ? Math.max(0, entry.wins) : 0,
+    bestScore: Number.isFinite(entry.bestScore) ? Math.max(0, entry.bestScore) : 0,
+    averageScore: Number.isFinite(entry.averageScore)
+      ? Math.max(0, entry.averageScore)
+      : 0,
+    lastPlayedAt:
+      typeof entry.lastPlayedAt === "string" && Number.isFinite(Date.parse(entry.lastPlayedAt))
+        ? entry.lastPlayedAt
+        : null,
+  };
+}
+
+function normalizeRemotePlayer(entry, fallbackName) {
+  if (!entry || typeof entry !== "object") {
+    return createEmptyPlayerStats(fallbackName);
+  }
+
+  return {
+    playerName: normalizePlayerName(entry.playerName ?? fallbackName),
+    totalScore: Number.isFinite(entry.totalScore) ? Math.max(0, entry.totalScore) : 0,
+    wins: Number.isFinite(entry.wins) ? Math.max(0, entry.wins) : 0,
+    bestScore: Number.isFinite(entry.bestScore) ? Math.max(0, entry.bestScore) : 0,
+    averageScore: Number.isFinite(entry.averageScore) ? Math.max(0, entry.averageScore) : 0,
+    rank: Number.isFinite(entry.rank) ? entry.rank : null,
+    lastPlayedAt:
+      typeof entry.lastPlayedAt === "string" && Number.isFinite(Date.parse(entry.lastPlayedAt))
+        ? entry.lastPlayedAt
+        : null,
+  };
 }
 
 function isPuzzleShape(puzzle, size) {
