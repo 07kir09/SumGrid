@@ -38,8 +38,13 @@ const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
 
+    if (isApiPath(url.pathname) && request.method === "OPTIONS") {
+      sendEmpty(response, 204, createApiHeaders(request.headers.origin));
+      return;
+    }
+
     if (url.pathname === "/api/profile/availability" && request.method === "GET") {
-      await handleGetNicknameAvailability(url, response);
+      await handleGetNicknameAvailability(request, url, response);
       return;
     }
 
@@ -55,6 +60,11 @@ const server = http.createServer(async (request, response) => {
 
     if (url.pathname === "/api/results" && request.method === "POST") {
       await handlePostResult(request, response);
+      return;
+    }
+
+    if (isApiPath(url.pathname)) {
+      sendApiJson(response, request, 405, { error: "Method not allowed." });
       return;
     }
 
@@ -74,11 +84,11 @@ server.listen(PORT, HOST, () => {
   console.log(`Sum Grid server is running at http://${HOST}:${PORT}`);
 });
 
-async function handleGetNicknameAvailability(url, response) {
+async function handleGetNicknameAvailability(request, url, response) {
   const nickname = sanitizeNickname(url.searchParams.get("nickname") || "");
 
   if (!isNicknameValid(nickname)) {
-    sendJson(response, 200, {
+    sendApiJson(response, request, 200, {
       nickname,
       available: false,
       valid: false,
@@ -90,7 +100,7 @@ async function handleGetNicknameAvailability(url, response) {
   const players = await loadStoredPlayers();
   const available = !isNicknameTaken(players, nickname);
 
-  sendJson(response, 200, {
+  sendApiJson(response, request, 200, {
     nickname,
     available,
     valid: true,
@@ -109,7 +119,7 @@ async function handleRegisterProfile(request, response) {
   const limit = parseLimit(body.limit);
 
   if (!isNicknameValid(nickname)) {
-    sendJson(response, 400, {
+    sendApiJson(response, request, 400, {
       error: "Ник должен быть длиной от 3 символов и содержать только буквы, цифры, _ или -.",
     });
     return;
@@ -118,7 +128,7 @@ async function handleRegisterProfile(request, response) {
   const players = await loadStoredPlayers();
 
   if (isNicknameTaken(players, nickname)) {
-    sendJson(response, 409, { error: "Такой ник уже занят." });
+    sendApiJson(response, request, 409, { error: "Такой ник уже занят." });
     return;
   }
 
@@ -132,7 +142,7 @@ async function handleRegisterProfile(request, response) {
   const entries = await loadStoredEntries();
   const leaderboard = buildLeaderboard(entries);
 
-  sendJson(response, 201, {
+  sendApiJson(response, request, 201, {
     nickname,
     leaderboard: leaderboard.slice(0, limit),
     currentPlayer: getPlayerStats(leaderboard, nickname),
@@ -146,7 +156,7 @@ async function handleGetLeaderboard(url, response) {
   const leaderboard = buildLeaderboard(entries);
   const players = await loadStoredPlayers();
 
-  sendJson(response, 200, {
+  sendApiJson(response, request, 200, {
     leaderboard: leaderboard.slice(0, limit),
     currentPlayer: getPlayerStats(leaderboard, playerName),
     isRegistered: playerName ? isNicknameTaken(players, playerName) : false,
@@ -165,7 +175,7 @@ async function handlePostResult(request, response) {
   const payload = normalizeResultPayload(body);
 
   if (!payload) {
-    sendJson(response, 400, { error: "Invalid result payload." });
+    sendApiJson(response, request, 400, { error: "Invalid result payload." });
     return;
   }
 
@@ -192,7 +202,7 @@ async function handlePostResult(request, response) {
 
   const leaderboard = buildLeaderboard(entries);
 
-  sendJson(response, 201, {
+  sendApiJson(response, request, 201, {
     entry,
     leaderboard: leaderboard.slice(0, limit),
     currentPlayer: getPlayerStats(leaderboard, viewerName || payload.playerName),
@@ -385,7 +395,7 @@ async function safelyReadBody(request, response) {
   try {
     return await readJsonBody(request);
   } catch (error) {
-    sendJson(response, 400, {
+    sendApiJson(response, request, 400, {
       error: error instanceof Error ? error.message : "Unable to parse request body.",
     });
     return null;
@@ -423,10 +433,33 @@ function parseLimit(value) {
   return Math.min(Math.max(limit, 1), MAX_LIMIT);
 }
 
-function sendJson(response, statusCode, payload) {
+function isApiPath(pathname) {
+  return pathname === "/api" || pathname.startsWith("/api/");
+}
+
+function createApiHeaders(origin) {
+  return {
+    "Access-Control-Allow-Origin": origin || "*",
+    "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
+    Vary: "Origin",
+  };
+}
+
+function sendApiJson(response, request, statusCode, payload) {
+  sendJson(response, statusCode, payload, createApiHeaders(request.headers.origin));
+}
+
+function sendEmpty(response, statusCode, headers = {}) {
+  response.writeHead(statusCode, headers);
+  response.end();
+}
+
+function sendJson(response, statusCode, payload, headers = {}) {
   response.writeHead(statusCode, {
     "Content-Type": "application/json; charset=utf-8",
     "Cache-Control": "no-store",
+    ...headers,
   });
   response.end(JSON.stringify(payload));
 }

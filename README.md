@@ -33,6 +33,13 @@ npm start
 http://localhost:4173
 ```
 
+Важно:
+
+- общий рейтинг и уникальные ники работают только через backend
+- если открыть `index.html` напрямую или через обычный статический хостинг без `server.js`, запросы `/api/*` будут падать
+- если фронтенд крутится отдельно от backend, укажи URL сервера в `index.html` через `<meta name="sumgrid-api-root" content="https://your-backend.example.com">`
+- для локальной разработки со статическим фронтом на другом порту backend можно держать на `http://localhost:4173`, сервер уже отдаёт CORS-заголовки
+
 ## Как работает рейтинг
 
 - фронтенд отправляет завершённый результат на `POST /api/results`
@@ -73,6 +80,25 @@ http://localhost:4173
   "elapsedMs": 154000,
   "boardId": "puzzle-abc123",
   "createdAt": "2026-04-18T18:00:00.000Z"
+}
+```
+
+### `GET /api/profile/availability`
+
+Пример:
+
+```text
+/api/profile/availability?nickname=Kirill
+```
+
+### `POST /api/profile/register`
+
+Тело запроса:
+
+```json
+{
+  "nickname": "Kirill",
+  "limit": 8
 }
 ```
 
