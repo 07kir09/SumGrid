@@ -8,8 +8,9 @@ import {
   buildLeaderboard,
   calculateRoundScore,
   getPlayerStats,
+  isNicknameValid,
   normalizeLeaderboardEntries,
-  normalizePlayerName,
+  sanitizeNickname,
 } from "./src/scoring.js";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -18,6 +19,7 @@ const PORT = Number.parseInt(process.env.PORT || "4173", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 const DATA_DIR = path.join(__dirname, "data");
 const RESULTS_FILE = path.join(DATA_DIR, "leaderboard.json");
+const PLAYERS_FILE = path.join(DATA_DIR, "players.json");
 const PUBLIC_ROOT = __dirname;
 const MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_LIMIT = 8;
@@ -35,6 +37,16 @@ const MIME_TYPES = {
 const server = http.createServer(async (request, response) => {
   try {
     const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+
+    if (url.pathname === "/api/profile/availability" && request.method === "GET") {
+      await handleGetNicknameAvailability(url, response);
+      return;
+    }
+
+    if (url.pathname === "/api/profile/register" && request.method === "POST") {
+      await handleRegisterProfile(request, response);
+      return;
+    }
 
     if (url.pathname === "/api/leaderboard" && request.method === "GET") {
       await handleGetLeaderboard(url, response);
@@ -62,30 +74,91 @@ server.listen(PORT, HOST, () => {
   console.log(`Sum Grid server is running at http://${HOST}:${PORT}`);
 });
 
-async function handleGetLeaderboard(url, response) {
-  const limit = parseLimit(url.searchParams.get("limit"));
-  const playerName = normalizePlayerName(url.searchParams.get("playerName") || "");
+async function handleGetNicknameAvailability(url, response) {
+  const nickname = sanitizeNickname(url.searchParams.get("nickname") || "");
+
+  if (!isNicknameValid(nickname)) {
+    sendJson(response, 200, {
+      nickname,
+      available: false,
+      valid: false,
+      message: "Ник должен быть длиной от 3 символов и содержать только буквы, цифры, _ или -.",
+    });
+    return;
+  }
+
+  const players = await loadStoredPlayers();
+  const available = !isNicknameTaken(players, nickname);
+
+  sendJson(response, 200, {
+    nickname,
+    available,
+    valid: true,
+    message: available ? "Ник свободен." : "Такой ник уже занят.",
+  });
+}
+
+async function handleRegisterProfile(request, response) {
+  const body = await safelyReadBody(request, response);
+
+  if (!body) {
+    return;
+  }
+
+  const nickname = sanitizeNickname(body.nickname);
+  const limit = parseLimit(body.limit);
+
+  if (!isNicknameValid(nickname)) {
+    sendJson(response, 400, {
+      error: "Ник должен быть длиной от 3 символов и содержать только буквы, цифры, _ или -.",
+    });
+    return;
+  }
+
+  const players = await loadStoredPlayers();
+
+  if (isNicknameTaken(players, nickname)) {
+    sendJson(response, 409, { error: "Такой ник уже занят." });
+    return;
+  }
+
+  const nextPlayers = [
+    { nickname, createdAt: new Date().toISOString() },
+    ...players,
+  ];
+
+  await saveStoredPlayers(nextPlayers);
+
   const entries = await loadStoredEntries();
   const leaderboard = buildLeaderboard(entries);
+
+  sendJson(response, 201, {
+    nickname,
+    leaderboard: leaderboard.slice(0, limit),
+    currentPlayer: getPlayerStats(leaderboard, nickname),
+  });
+}
+
+async function handleGetLeaderboard(url, response) {
+  const limit = parseLimit(url.searchParams.get("limit"));
+  const playerName = sanitizeNickname(url.searchParams.get("playerName") || "");
+  const entries = await loadStoredEntries();
+  const leaderboard = buildLeaderboard(entries);
+  const players = await loadStoredPlayers();
 
   sendJson(response, 200, {
     leaderboard: leaderboard.slice(0, limit),
     currentPlayer: getPlayerStats(leaderboard, playerName),
+    isRegistered: playerName ? isNicknameTaken(players, playerName) : false,
     totalPlayers: leaderboard.length,
     totalResults: entries.length,
   });
 }
 
 async function handlePostResult(request, response) {
-  let body;
+  const body = await safelyReadBody(request, response);
 
-  try {
-    body = await readJsonBody(request);
-  } catch (error) {
-    sendJson(response, 400, {
-      error:
-        error instanceof Error ? error.message : "Unable to parse request body.",
-    });
+  if (!body) {
     return;
   }
 
@@ -96,8 +169,17 @@ async function handlePostResult(request, response) {
     return;
   }
 
-  const viewerName = normalizePlayerName(body?.viewerName || payload.playerName);
+  const viewerName = sanitizeNickname(body?.viewerName || payload.playerName);
   const limit = parseLimit(body?.limit);
+  const players = await loadStoredPlayers();
+
+  if (!isNicknameTaken(players, payload.playerName)) {
+    await saveStoredPlayers([
+      { nickname: payload.playerName, createdAt: new Date().toISOString() },
+      ...players,
+    ]);
+  }
+
   const score = calculateRoundScore(payload).score;
   const entry = {
     ...payload,
@@ -113,7 +195,7 @@ async function handlePostResult(request, response) {
   sendJson(response, 201, {
     entry,
     leaderboard: leaderboard.slice(0, limit),
-    currentPlayer: getPlayerStats(leaderboard, viewerName),
+    currentPlayer: getPlayerStats(leaderboard, viewerName || payload.playerName),
     totalPlayers: leaderboard.length,
     totalResults: entries.length,
   });
@@ -166,12 +248,11 @@ async function serveStatic(pathname, response, isHead) {
 }
 
 async function loadStoredEntries() {
-  await ensureResultsFile();
+  await ensureDataFiles();
 
   try {
     const raw = await fs.readFile(RESULTS_FILE, "utf8");
-    const parsed = JSON.parse(raw);
-    return normalizeLeaderboardEntries(parsed);
+    return normalizeLeaderboardEntries(JSON.parse(raw));
   } catch (error) {
     console.warn("Unable to read leaderboard data.", error);
     return [];
@@ -179,17 +260,38 @@ async function loadStoredEntries() {
 }
 
 async function saveStoredEntries(entries) {
-  await ensureResultsFile();
+  await ensureDataFiles();
   await fs.writeFile(RESULTS_FILE, JSON.stringify(entries, null, 2), "utf8");
 }
 
-async function ensureResultsFile() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+async function loadStoredPlayers() {
+  await ensureDataFiles();
 
   try {
-    await fs.access(RESULTS_FILE);
+    const raw = await fs.readFile(PLAYERS_FILE, "utf8");
+    return normalizeStoredPlayers(JSON.parse(raw));
+  } catch (error) {
+    console.warn("Unable to read player registry.", error);
+    return [];
+  }
+}
+
+async function saveStoredPlayers(players) {
+  await ensureDataFiles();
+  await fs.writeFile(PLAYERS_FILE, JSON.stringify(normalizeStoredPlayers(players), null, 2), "utf8");
+}
+
+async function ensureDataFiles() {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  await ensureJsonFile(RESULTS_FILE);
+  await ensureJsonFile(PLAYERS_FILE);
+}
+
+async function ensureJsonFile(filePath) {
+  try {
+    await fs.access(filePath);
   } catch {
-    await fs.writeFile(RESULTS_FILE, "[]\n", "utf8");
+    await fs.writeFile(filePath, "[]\n", "utf8");
   }
 }
 
@@ -198,15 +300,16 @@ function normalizeResultPayload(body) {
     return null;
   }
 
+  const playerName = sanitizeNickname(body.playerName);
   const size = BOARD_SIZES.includes(body.size) ? body.size : null;
   const difficultyId = DIFFICULTIES[body.difficultyId] ? body.difficultyId : null;
 
-  if (!size || !difficultyId) {
+  if (!playerName || !size || !difficultyId) {
     return null;
   }
 
   return {
-    playerName: normalizePlayerName(body.playerName),
+    playerName,
     size,
     difficultyId,
     moves: Number.isFinite(body.moves) ? Math.max(0, body.moves) : 0,
@@ -222,6 +325,71 @@ function normalizeResultPayload(body) {
         ? new Date(body.createdAt).toISOString()
         : new Date().toISOString(),
   };
+}
+
+function normalizeStoredPlayers(players) {
+  if (!Array.isArray(players)) {
+    return [];
+  }
+
+  const seen = new Set();
+
+  return players
+    .map((entry) => normalizeStoredPlayer(entry))
+    .filter((entry) => {
+      if (!entry) {
+        return false;
+      }
+
+      const key = entry.nickname.toLocaleLowerCase("ru-RU");
+
+      if (seen.has(key)) {
+        return false;
+      }
+
+      seen.add(key);
+      return true;
+    })
+    .sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+}
+
+function normalizeStoredPlayer(entry) {
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  const nickname = sanitizeNickname(entry.nickname);
+
+  if (!isNicknameValid(nickname)) {
+    return null;
+  }
+
+  return {
+    nickname,
+    createdAt:
+      typeof entry.createdAt === "string" && Number.isFinite(Date.parse(entry.createdAt))
+        ? new Date(entry.createdAt).toISOString()
+        : new Date().toISOString(),
+  };
+}
+
+function isNicknameTaken(players, nickname) {
+  const normalizedNickname = sanitizeNickname(nickname).toLocaleLowerCase("ru-RU");
+
+  return players.some(
+    (entry) => entry.nickname.toLocaleLowerCase("ru-RU") === normalizedNickname
+  );
+}
+
+async function safelyReadBody(request, response) {
+  try {
+    return await readJsonBody(request);
+  } catch (error) {
+    sendJson(response, 400, {
+      error: error instanceof Error ? error.message : "Unable to parse request body.",
+    });
+    return null;
+  }
 }
 
 async function readJsonBody(request) {
@@ -242,8 +410,7 @@ async function readJsonBody(request) {
     return {};
   }
 
-  const raw = Buffer.concat(chunks).toString("utf8");
-  return JSON.parse(raw);
+  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
 
 function parseLimit(value) {

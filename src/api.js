@@ -1,5 +1,24 @@
 const API_ROOT = "/api";
 
+export async function checkNicknameAvailability(nickname) {
+  const params = new URLSearchParams();
+  params.set("nickname", nickname);
+  return requestJson(`${API_ROOT}/profile/availability?${params.toString()}`);
+}
+
+export async function registerNickname(nickname, { limit = 8 } = {}) {
+  return requestJson(`${API_ROOT}/profile/register`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      nickname,
+      limit,
+    }),
+  });
+}
+
 export async function fetchLeaderboard({ playerName = "", limit = 8 } = {}) {
   const params = new URLSearchParams();
   params.set("limit", String(limit));

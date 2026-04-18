@@ -8,6 +8,7 @@ export class SumGridUI {
     this.game = game;
     this.hasRenderedOnce = false;
     this.previousBoardLocked = false;
+    this.profilePreviewTimer = null;
 
     this.root.addEventListener("click", (event) => {
       const target =
@@ -48,15 +49,38 @@ export class SumGridUI {
       }
     });
 
-    this.root.addEventListener("change", (event) => {
+    this.root.addEventListener("input", (event) => {
       const target = event.target;
 
       if (!(target instanceof HTMLInputElement)) {
         return;
       }
 
-      if (target.matches("[data-player-name]")) {
-        this.game.setPlayerName(target.value);
+      if (target.matches("[data-profile-draft]")) {
+        window.clearTimeout(this.profilePreviewTimer);
+        this.profilePreviewTimer = window.setTimeout(() => {
+          void this.game.previewProfileAvailability(target.value);
+        }, 220);
+      }
+    });
+
+    this.root.addEventListener("submit", (event) => {
+      const form = event.target;
+
+      if (!(form instanceof HTMLFormElement) || !form.matches("[data-profile-form]")) {
+        return;
+      }
+
+      event.preventDefault();
+      window.clearTimeout(this.profilePreviewTimer);
+      const input = form.querySelector("[data-profile-draft]");
+      const value = input instanceof HTMLInputElement ? input.value : "";
+      void this.game.registerProfile(value);
+    });
+
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        this.game.closeProfilePanel();
       }
     });
   }
@@ -74,21 +98,44 @@ export class SumGridUI {
 
     document.title = viewModel.isSolved
       ? "Sum Grid - Решено"
-      : `Sum Grid - ${viewModel.size}×${viewModel.size}`;
+      : "Sum Grid";
 
     this.root.innerHTML = `
-      <div class="page-shell ${this.hasRenderedOnce ? "is-hydrated" : ""}">
+      <div class="page-shell ${this.hasRenderedOnce ? "is-hydrated" : ""} ${
+        viewModel.isProfilePanelOpen ? "has-sheet-open" : ""
+      }">
         <div class="backdrop-orb backdrop-orb--left"></div>
         <div class="backdrop-orb backdrop-orb--right"></div>
 
         <header class="topbar panel">
-          <div class="topbar__brand">
-            <img class="topbar__logo" src="./assets/logo-sum-grid.svg" alt="Логотип Sum Grid" />
-            <div class="topbar__copy">
-              <div class="eyebrow">Премиальная логическая головоломка</div>
-              <h1 class="topbar__title"><span>Sum</span> Grid</h1>
-              <p class="topbar__subtitle">Собери точные суммы в строках и столбцах.</p>
+          <div class="topbar__row">
+            <div class="topbar__brand">
+              <img class="topbar__logo" src="./assets/logo-sum-grid.svg" alt="Логотип Sum Grid" />
+              <div class="topbar__copy">
+                <div class="eyebrow">Премиальная логическая головоломка</div>
+                <h1 class="topbar__title"><span>Sum</span> Grid</h1>
+                <p class="topbar__subtitle">Собери точные суммы в строках и столбцах.</p>
+              </div>
             </div>
+
+            <button
+              type="button"
+              class="profile-trigger ${viewModel.isProfileReady ? "" : "is-disabled"}"
+              data-action="toggle-profile"
+              ${viewModel.isProfileReady ? "" : "disabled"}
+            >
+              <span class="profile-trigger__eyebrow">Профиль</span>
+              <strong>${escapeHtml(
+                viewModel.isProfileReady ? viewModel.playerName : "Создай ник"
+              )}</strong>
+              <small>${
+                viewModel.isProfileReady
+                  ? viewModel.currentPlayer.rank
+                    ? `Место #${viewModel.currentPlayer.rank}`
+                    : "Пока без места"
+                  : "Нужен для общего рейтинга"
+              }</small>
+            </button>
           </div>
 
           <div class="topbar__stats">
@@ -97,9 +144,10 @@ export class SumGridUI {
             ${renderMetric("Раунд", `#${boardCode}`)}
             ${renderMetric("Время", viewModel.elapsedLabel, "timer")}
             ${renderMetric("Очки", formatNumber(viewModel.currentPlayer.totalScore))}
-            ${renderMetric("Место", viewModel.currentPlayer.rank ? `#${viewModel.currentPlayer.rank}` : "—")}
           </div>
         </header>
+
+        ${renderProfileSheet(viewModel)}
 
         <main class="play-layout">
           <section class="board-stage panel">
@@ -155,14 +203,14 @@ export class SumGridUI {
                       ${renderVictoryCard(viewModel, boardCode)}
                     </div>
                   `
-                  : viewModel.boardLocked
+                  : viewModel.boardLocked && viewModel.isProfileReady
                   ? `
                     <div class="board-overlay">
                       <div class="board-overlay__card board-overlay__card--compact">
                         <div class="section-label">Раунд не начат</div>
                         <h3>${viewModel.startButtonLabel}</h3>
                         <p class="board-overlay__intro">
-                          Если хочешь продолжить, нажми кнопку ниже или открой правила игры.
+                          Нажми кнопку ниже, чтобы открыть доску и запустить таймер.
                         </p>
                         <button type="button" class="action-button action-button--primary board-overlay__button board-overlay__button--compact" data-action="start">
                           ${viewModel.startButtonLabel}
@@ -248,51 +296,6 @@ export class SumGridUI {
                 </div>
               </div>
 
-              <div class="control-rack__row control-rack__row--profile">
-                <div class="control-group">
-                  <div class="section-label">Игрок</div>
-                  <label class="text-field">
-                    <span class="text-field__label">Имя в рейтинге</span>
-                    <input
-                      type="text"
-                      maxlength="24"
-                      class="text-field__input"
-                      data-player-name
-                      value="${escapeHtml(viewModel.playerName)}"
-                    />
-                  </label>
-
-                  <div class="profile-stats">
-                    ${renderProfileStat("Очки", formatNumber(viewModel.currentPlayer.totalScore))}
-                    ${renderProfileStat("Победы", String(viewModel.currentPlayer.wins))}
-                    ${renderProfileStat("Лучший", formatNumber(viewModel.currentPlayer.bestScore))}
-                    ${renderProfileStat(
-                      "Место",
-                      viewModel.currentPlayer.rank ? `#${viewModel.currentPlayer.rank}` : "—"
-                    )}
-                  </div>
-
-                  <p class="control-group__hint">
-                    Очки зависят от сложности, размера поля, времени, лишних ходов и числа подсказок.
-                  </p>
-                </div>
-
-                <div class="control-group control-group--leaderboard">
-                  <div class="leaderboard__header">
-                    <div>
-                      <div class="section-label">Рейтинг</div>
-                      <strong class="leaderboard__title">Общий рейтинг игроков</strong>
-                    </div>
-                    <span class="chip">${
-                      viewModel.isLeaderboardLoading
-                        ? "синхронизация"
-                        : `${viewModel.leaderboard.length || 0} в топе`
-                    }</span>
-                  </div>
-                  ${renderLeaderboard(viewModel)}
-                </div>
-              </div>
-
               <div class="control-rack__row control-rack__row--actions">
                 ${renderActionButton("new-game", "Новая игра", "primary")}
                 ${renderActionButton("reset", "Сброс", "ghost")}
@@ -300,7 +303,10 @@ export class SumGridUI {
                   "hint",
                   viewModel.remainingHints > 0 ? "Дать подсказку" : "Подсказок нет",
                   "accent",
-                  viewModel.boardLocked || viewModel.isSolved || viewModel.remainingHints === 0
+                  !viewModel.isProfileReady ||
+                    viewModel.boardLocked ||
+                    viewModel.isSolved ||
+                    viewModel.remainingHints === 0
                 )}
               </div>
 
@@ -316,6 +322,8 @@ export class SumGridUI {
             </div>
           </section>
         </main>
+
+        ${!viewModel.isProfileReady ? renderProfileOnboarding(viewModel) : ""}
       </div>
     `;
 
@@ -370,6 +378,16 @@ export class SumGridUI {
 
     if (action === "hint") {
       this.game.useHint();
+      return;
+    }
+
+    if (action === "toggle-profile") {
+      this.game.toggleProfilePanel();
+      return;
+    }
+
+    if (action === "close-profile") {
+      this.game.closeProfilePanel();
     }
   }
 }
@@ -393,6 +411,106 @@ function renderActionButton(action, label, variant, disabled = false) {
     >
       ${label}
     </button>
+  `;
+}
+
+function renderProfileOnboarding(viewModel) {
+  return `
+    <div class="startup-overlay">
+      <section class="startup-card panel" aria-live="polite">
+        <div class="section-label">Личный кабинет</div>
+        <h2 class="startup-card__title">Придумай уникальный никнейм</h2>
+        <p class="startup-card__text">
+          Ник нужен для общего рейтинга игроков. Один ник можно занять только один раз.
+        </p>
+
+        <form class="startup-form" data-profile-form>
+          <label class="text-field">
+            <span class="text-field__label">Уникальный ник</span>
+            <input
+              type="text"
+              maxlength="24"
+              class="text-field__input text-field__input--hero"
+              data-profile-draft
+              value="${escapeHtml(viewModel.profileDraft)}"
+              placeholder="например, Kirill_07"
+              autocomplete="nickname"
+              autocapitalize="off"
+              spellcheck="false"
+              autofocus
+            />
+          </label>
+
+          <p class="startup-card__hint">Разрешены буквы, цифры, _ и -. Минимум 3 символа.</p>
+
+          ${
+            viewModel.profileStatusMessage
+              ? `<p class="startup-card__status" data-tone="${viewModel.profileStatusTone}">${escapeHtml(
+                  viewModel.profileStatusMessage
+                )}</p>`
+              : ""
+          }
+
+          <button
+            type="submit"
+            class="action-button action-button--primary startup-card__button"
+            ${viewModel.hasPendingProfileAction ? "disabled" : ""}
+          >
+            ${viewModel.isProfileSubmitting ? "Создаём профиль..." : "Создать профиль"}
+          </button>
+        </form>
+      </section>
+    </div>
+  `;
+}
+
+function renderProfileSheet(viewModel) {
+  return `
+    <div class="profile-sheet ${viewModel.isProfilePanelOpen ? "is-open" : ""}">
+      <button
+        type="button"
+        class="profile-sheet__backdrop"
+        aria-label="Закрыть профиль"
+        data-action="close-profile"
+      ></button>
+      <aside class="profile-sheet__panel panel">
+        <div class="profile-sheet__header">
+          <div>
+            <div class="section-label">Профиль</div>
+            <h2 class="profile-sheet__title">${escapeHtml(viewModel.playerName || DEFAULT_PROFILE_LABEL)}</h2>
+            <p class="profile-sheet__subtitle">Общий рейтинг и персональная статистика.</p>
+          </div>
+          <button type="button" class="profile-sheet__close" data-action="close-profile" aria-label="Закрыть профиль">
+            ×
+          </button>
+        </div>
+
+        <div class="profile-stats profile-stats--sheet">
+          ${renderProfileStat("Очки", formatNumber(viewModel.currentPlayer.totalScore))}
+          ${renderProfileStat("Победы", String(viewModel.currentPlayer.wins))}
+          ${renderProfileStat("Лучший", formatNumber(viewModel.currentPlayer.bestScore))}
+          ${renderProfileStat(
+            "Место",
+            viewModel.currentPlayer.rank ? `#${viewModel.currentPlayer.rank}` : "—"
+          )}
+        </div>
+
+        <div class="leaderboard-block">
+          <div class="leaderboard__header">
+            <div>
+              <div class="section-label">Рейтинг</div>
+              <strong class="leaderboard__title">Общий рейтинг игроков</strong>
+            </div>
+            <span class="chip">${
+              viewModel.isLeaderboardLoading
+                ? "синхронизация"
+                : `${viewModel.leaderboard.length || 0} в топе`
+            }</span>
+          </div>
+          ${renderLeaderboard(viewModel)}
+        </div>
+      </aside>
+    </div>
   `;
 }
 
@@ -643,3 +761,5 @@ function escapeHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
+
+const DEFAULT_PROFILE_LABEL = "Профиль";

@@ -40,10 +40,27 @@ const SCORE_BASELINE = 1000;
 const SCORE_FLOOR = 60;
 const SCORE_CAP = 9999;
 const LEADERBOARD_LIMIT = 200;
+export const MIN_NICKNAME_LENGTH = 3;
+export const MAX_NICKNAME_LENGTH = 24;
+
+export function sanitizeNickname(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .normalize("NFKC")
+    .replace(/[^\p{L}\p{N}_-]+/gu, "")
+    .slice(0, MAX_NICKNAME_LENGTH);
+}
+
+export function isNicknameValid(value) {
+  const nickname = sanitizeNickname(value);
+  return nickname.length >= MIN_NICKNAME_LENGTH;
+}
 
 export function normalizePlayerName(value) {
-  const normalized =
-    typeof value === "string" ? value.replace(/\s+/g, " ").trim().slice(0, 24) : "";
+  const normalized = sanitizeNickname(value);
 
   return normalized || DEFAULT_PLAYER_NAME;
 }

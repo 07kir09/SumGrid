@@ -6,7 +6,12 @@ import {
   DEFAULT_SIZE,
   DIFFICULTIES,
 } from "./constants.js";
-import { fetchLeaderboard, submitResult } from "./api.js";
+import {
+  checkNicknameAvailability,
+  fetchLeaderboard,
+  registerNickname,
+  submitResult,
+} from "./api.js";
 import {
   buildEmptyMarks,
   calculateColumnSums,
@@ -15,7 +20,12 @@ import {
   getLineStatus,
   summarizeTargets,
 } from "./generator.js";
-import { calculateRoundScore, normalizePlayerName } from "./scoring.js";
+import {
+  calculateRoundScore,
+  isNicknameValid,
+  normalizePlayerName,
+  sanitizeNickname,
+} from "./scoring.js";
 import { loadPersistedState, savePersistedState } from "./storage.js";
 import { cloneMatrix, createMatrix, formatDuration, pluralizeRu } from "./utils.js";
 
@@ -27,6 +37,7 @@ export class SumGridGame {
   constructor() {
     this.listeners = new Set();
     this.isSyncingResults = false;
+    this.profileAvailabilityRequestId = 0;
     this.state = this.createBaseState();
 
     const restored = this.restore();
@@ -51,6 +62,10 @@ export class SumGridGame {
   }
 
   async initialize() {
+    if (!this.state.isProfileReady) {
+      return;
+    }
+
     if (this.state.pendingResults.length > 0) {
       await this.flushPendingResults();
       return;
@@ -96,18 +111,130 @@ export class SumGridGame {
     this.emit();
   }
 
-  setPlayerName(name) {
-    const nextName = normalizePlayerName(name);
-
-    if (nextName === this.state.playerName) {
+  openProfilePanel() {
+    if (!this.state.isProfileReady || this.state.isProfilePanelOpen) {
       return;
     }
 
-    this.state.playerName = nextName;
-    this.state.currentPlayer = createEmptyPlayerStats(nextName);
-    this.persist();
+    this.state.isProfilePanelOpen = true;
     this.emit();
     void this.refreshLeaderboard({ silent: true });
+  }
+
+  closeProfilePanel() {
+    if (!this.state.isProfilePanelOpen) {
+      return;
+    }
+
+    this.state.isProfilePanelOpen = false;
+    this.emit();
+  }
+
+  toggleProfilePanel() {
+    if (this.state.isProfilePanelOpen) {
+      this.closeProfilePanel();
+      return;
+    }
+
+    this.openProfilePanel();
+  }
+
+  async previewProfileAvailability(nicknameInput) {
+    const nickname = sanitizeNickname(nicknameInput);
+
+    this.state.profileDraft = nickname;
+
+    if (!nickname) {
+      this.state.isProfileChecking = false;
+      this.state.profileStatusMessage = "";
+      this.state.profileStatusTone = "neutral";
+      this.emit();
+      return false;
+    }
+
+    if (!isNicknameValid(nickname)) {
+      this.state.isProfileChecking = false;
+      this.state.profileStatusMessage =
+        "Ник должен быть длиной от 3 символов и содержать только буквы, цифры, _ или -.";
+      this.state.profileStatusTone = "danger";
+      this.emit();
+      return false;
+    }
+
+    const requestId = ++this.profileAvailabilityRequestId;
+    this.state.isProfileChecking = true;
+    this.state.profileStatusMessage = "Проверяем ник...";
+    this.state.profileStatusTone = "neutral";
+    this.emit();
+
+    try {
+      const payload = await checkNicknameAvailability(nickname);
+
+      if (requestId !== this.profileAvailabilityRequestId) {
+        return false;
+      }
+
+      this.state.isProfileChecking = false;
+      this.state.profileStatusMessage = payload?.message || "";
+      this.state.profileStatusTone = payload?.available ? "success" : "danger";
+      this.emit();
+
+      return Boolean(payload?.available);
+    } catch (error) {
+      if (requestId !== this.profileAvailabilityRequestId) {
+        return false;
+      }
+
+      this.state.isProfileChecking = false;
+      this.state.profileStatusMessage =
+        error instanceof Error ? error.message : "Не удалось проверить ник.";
+      this.state.profileStatusTone = "danger";
+      this.emit();
+      return false;
+    }
+  }
+
+  async registerProfile(nicknameInput) {
+    const nickname = sanitizeNickname(nicknameInput);
+
+    this.state.profileDraft = nickname;
+    this.profileAvailabilityRequestId += 1;
+
+    if (!isNicknameValid(nickname)) {
+      this.state.profileStatusMessage =
+        "Ник должен быть длиной от 3 символов и содержать только буквы, цифры, _ или -.";
+      this.state.profileStatusTone = "danger";
+      this.emit();
+      return false;
+    }
+
+    this.state.isProfileSubmitting = true;
+    this.state.profileStatusMessage = "Создаём профиль...";
+    this.state.profileStatusTone = "neutral";
+    this.emit();
+
+    try {
+      const payload = await registerNickname(nickname, { limit: LEADERBOARD_LIMIT });
+
+      this.state.playerName = nickname;
+      this.state.isProfileReady = true;
+      this.state.isProfileSubmitting = false;
+      this.state.isProfileChecking = false;
+      this.state.profileStatusMessage = "Профиль создан. Ник закреплён за тобой на этом устройстве.";
+      this.state.profileStatusTone = "success";
+      this.applyLeaderboardResponse(payload);
+      this.persist();
+      this.emit();
+      return true;
+    } catch (error) {
+      this.state.isProfileSubmitting = false;
+      this.state.isProfileChecking = false;
+      this.state.profileStatusMessage =
+        error instanceof Error ? error.message : "Не удалось создать профиль.";
+      this.state.profileStatusTone = "danger";
+      this.emit();
+      return false;
+    }
   }
 
   setSize(size) {
@@ -127,7 +254,7 @@ export class SumGridGame {
   }
 
   resetBoard() {
-    if (!this.state.puzzle) {
+    if (!this.state.puzzle || !this.state.isProfileReady) {
       return;
     }
 
@@ -148,7 +275,12 @@ export class SumGridGame {
   }
 
   startRound() {
-    if (!this.state.puzzle || this.state.isSolved || this.state.isRoundStarted) {
+    if (
+      !this.state.isProfileReady ||
+      !this.state.puzzle ||
+      this.state.isSolved ||
+      this.state.isRoundStarted
+    ) {
       return;
     }
 
@@ -186,7 +318,12 @@ export class SumGridGame {
   }
 
   cycleCell(rowIndex, columnIndex) {
-    if (!this.state.puzzle || this.state.isSolved || !this.state.isRoundStarted) {
+    if (
+      !this.state.isProfileReady ||
+      !this.state.puzzle ||
+      this.state.isSolved ||
+      !this.state.isRoundStarted
+    ) {
       return;
     }
 
@@ -220,7 +357,7 @@ export class SumGridGame {
   }
 
   useHint() {
-    if (!this.state.puzzle) {
+    if (!this.state.isProfileReady || !this.state.puzzle) {
       return;
     }
 
@@ -296,16 +433,15 @@ export class SumGridGame {
   }
 
   async refreshLeaderboard({ silent = false } = {}) {
-    if (this.isSyncingResults) {
+    if (this.isSyncingResults || !this.state.isProfileReady) {
       return;
     }
 
+    this.state.isLeaderboardLoading = true;
+
     if (!silent) {
-      this.state.isLeaderboardLoading = true;
       this.state.leaderboardError = "";
       this.emit();
-    } else {
-      this.state.isLeaderboardLoading = true;
     }
 
     try {
@@ -336,7 +472,10 @@ export class SumGridGame {
       difficulties: Object.values(DIFFICULTIES),
       boardSizes: BOARD_SIZES,
       elapsedLabel: formatDuration(this.getElapsedMs()),
-      progressPercent: Math.round((derived.correctLines / derived.totalLines) * 100),
+      progressPercent:
+        derived.totalLines > 0
+          ? Math.round((derived.correctLines / derived.totalLines) * 100)
+          : 0,
       totalLines: derived.totalLines,
       correctLines: derived.correctLines,
       exceededLines: derived.exceededLines,
@@ -347,7 +486,9 @@ export class SumGridGame {
       columnStatuses: derived.columnStatuses,
       selectionCount: derived.selectionCount,
       grandTarget: totals.rowTotal,
-      boardLocked: !this.state.isSolved && !this.state.isRoundStarted,
+      boardLocked:
+        !this.state.isProfileReady ||
+        (!this.state.isSolved && !this.state.isRoundStarted),
       startButtonLabel:
         this.state.moves > 0 || this.state.elapsedMs > 0
           ? "Продолжить игру"
@@ -360,6 +501,8 @@ export class SumGridGame {
       remainingHints: this.getAvailableHintCells().length,
       roundScore: roundScore?.score ?? null,
       roundScoreBreakdown: roundScore?.breakdown ?? null,
+      hasPendingProfileAction:
+        this.state.isProfileChecking || this.state.isProfileSubmitting,
     };
   }
 
@@ -367,7 +510,14 @@ export class SumGridGame {
     return {
       size: DEFAULT_SIZE,
       difficultyId: DEFAULT_DIFFICULTY,
-      playerName: DEFAULT_PLAYER_NAME,
+      playerName: "",
+      isProfileReady: false,
+      isProfilePanelOpen: false,
+      profileDraft: "",
+      profileStatusMessage: "",
+      profileStatusTone: "neutral",
+      isProfileChecking: false,
+      isProfileSubmitting: false,
       puzzle: null,
       marks: buildEmptyMarks(DEFAULT_SIZE),
       hintCells: buildHintMatrix(DEFAULT_SIZE),
@@ -382,7 +532,7 @@ export class SumGridGame {
       timerBaseMs: null,
       message: DEFAULT_MESSAGE,
       leaderboard: [],
-      currentPlayer: createEmptyPlayerStats(DEFAULT_PLAYER_NAME),
+      currentPlayer: createEmptyPlayerStats(""),
       isLeaderboardLoading: false,
       leaderboardError: "",
       pendingResults: [],
@@ -472,7 +622,8 @@ export class SumGridGame {
       return null;
     }
 
-    const playerName = normalizePlayerName(saved?.playerName);
+    const persistedPlayerName = sanitizeNickname(saved?.playerName);
+    const isProfileReady = Boolean(saved?.isProfileReady) && isNicknameValid(persistedPlayerName);
     const marks = isMarksMatrix(saved?.marks, size)
       ? saved.marks
       : buildEmptyMarks(size);
@@ -484,11 +635,19 @@ export class SumGridGame {
       : 0;
     const isSolved = Boolean(saved?.isSolved) && this.areTargetsMet(puzzle, marks);
     const isRoundStarted = Boolean(saved?.isRoundStarted) && !isSolved;
+    const profileDraft = sanitizeNickname(saved?.profileDraft || persistedPlayerName);
 
     return {
       size,
       difficultyId,
-      playerName,
+      playerName: isProfileReady ? persistedPlayerName : "",
+      isProfileReady,
+      isProfilePanelOpen: false,
+      profileDraft,
+      profileStatusMessage: "",
+      profileStatusTone: "neutral",
+      isProfileChecking: false,
+      isProfileSubmitting: false,
       puzzle,
       marks,
       hintCells,
@@ -515,7 +674,7 @@ export class SumGridGame {
           : DEFAULT_MESSAGE
         : "Поле готово. Нажми «Начать игру».",
       leaderboard: [],
-      currentPlayer: createEmptyPlayerStats(playerName),
+      currentPlayer: createEmptyPlayerStats(isProfileReady ? persistedPlayerName : ""),
       isLeaderboardLoading: false,
       leaderboardError: "",
       pendingResults: normalizePendingResults(saved?.pendingResults),
@@ -586,6 +745,11 @@ export class SumGridGame {
       currentPlayer: createEmptyPlayerStats(this.state.playerName),
       isLeaderboardLoading: false,
       leaderboardError: "",
+      isProfilePanelOpen: false,
+      isProfileChecking: false,
+      isProfileSubmitting: false,
+      profileStatusMessage: "",
+      profileStatusTone: "neutral",
     };
 
     savePersistedState(snapshot);
@@ -657,7 +821,11 @@ export class SumGridGame {
   }
 
   async flushPendingResults() {
-    if (this.isSyncingResults || this.state.pendingResults.length === 0) {
+    if (
+      this.isSyncingResults ||
+      !this.state.isProfileReady ||
+      this.state.pendingResults.length === 0
+    ) {
       return;
     }
 
@@ -706,7 +874,7 @@ function buildHintMatrix(size) {
 
 function createEmptyPlayerStats(playerName) {
   return {
-    playerName: normalizePlayerName(playerName),
+    playerName: playerName ? normalizePlayerName(playerName) : DEFAULT_PLAYER_NAME,
     totalScore: 0,
     wins: 0,
     bestScore: 0,
@@ -732,15 +900,16 @@ function normalizePendingResult(entry) {
     return null;
   }
 
+  const playerName = sanitizeNickname(entry.playerName);
   const size = BOARD_SIZES.includes(entry.size) ? entry.size : null;
   const difficultyId = DIFFICULTIES[entry.difficultyId] ? entry.difficultyId : null;
 
-  if (!size || !difficultyId) {
+  if (!playerName || !size || !difficultyId) {
     return null;
   }
 
   return {
-    playerName: normalizePlayerName(entry.playerName),
+    playerName,
     size,
     difficultyId,
     moves: Number.isFinite(entry.moves) ? Math.max(0, entry.moves) : 0,
