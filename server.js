@@ -17,13 +17,14 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const PORT = Number.parseInt(process.env.PORT || "4173", 10);
 const HOST = process.env.HOST || "0.0.0.0";
-const DATA_DIR = path.join(__dirname, "data");
+const DATA_DIR = path.resolve(process.env.DATA_DIR || path.join(__dirname, "data"));
 const RESULTS_FILE = path.join(DATA_DIR, "leaderboard.json");
 const PLAYERS_FILE = path.join(DATA_DIR, "players.json");
 const PUBLIC_ROOT = __dirname;
 const MAX_BODY_BYTES = 64 * 1024;
 const DEFAULT_LIMIT = 8;
 const MAX_LIMIT = 50;
+const CORS_ALLOWED_ORIGINS = parseAllowedOrigins(process.env.CORS_ALLOWED_ORIGINS);
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -35,11 +36,31 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer(async (request, response) => {
+  let url = null;
+
   try {
-    const url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+    url = new URL(request.url || "/", `http://${request.headers.host || "localhost"}`);
+
+    if (isApiPath(url.pathname)) {
+      const corsOrigin = getCorsOrigin(request.headers.origin);
+
+      if (request.headers.origin && !corsOrigin) {
+        sendJson(response, 403, { error: "Origin is not allowed." });
+        return;
+      }
+    }
 
     if (isApiPath(url.pathname) && request.method === "OPTIONS") {
       sendEmpty(response, 204, createApiHeaders(request.headers.origin));
+      return;
+    }
+
+    if (url.pathname === "/api/health" && request.method === "GET") {
+      sendApiJson(response, request, 200, {
+        ok: true,
+        service: "sum-grid-api",
+        timestamp: new Date().toISOString(),
+      });
       return;
     }
 
@@ -54,7 +75,7 @@ const server = http.createServer(async (request, response) => {
     }
 
     if (url.pathname === "/api/leaderboard" && request.method === "GET") {
-      await handleGetLeaderboard(url, response);
+      await handleGetLeaderboard(request, url, response);
       return;
     }
 
@@ -76,12 +97,19 @@ const server = http.createServer(async (request, response) => {
     await serveStatic(url.pathname, response, request.method === "HEAD");
   } catch (error) {
     console.error(error);
+
+    if (url && isApiPath(url.pathname)) {
+      sendApiJson(response, request, 500, { error: "Internal server error." });
+      return;
+    }
+
     sendJson(response, 500, { error: "Internal server error." });
   }
 });
 
 server.listen(PORT, HOST, () => {
   console.log(`Sum Grid server is running at http://${HOST}:${PORT}`);
+  console.log(`Data directory: ${DATA_DIR}`);
 });
 
 async function handleGetNicknameAvailability(request, url, response) {
@@ -149,7 +177,7 @@ async function handleRegisterProfile(request, response) {
   });
 }
 
-async function handleGetLeaderboard(url, response) {
+async function handleGetLeaderboard(request, url, response) {
   const limit = parseLimit(url.searchParams.get("limit"));
   const playerName = sanitizeNickname(url.searchParams.get("playerName") || "");
   const entries = await loadStoredEntries();
@@ -437,12 +465,54 @@ function isApiPath(pathname) {
   return pathname === "/api" || pathname.startsWith("/api/");
 }
 
+function parseAllowedOrigins(value) {
+  if (typeof value !== "string" || !value.trim()) {
+    return null;
+  }
+
+  const origins = value
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
+  if (origins.includes("*")) {
+    return ["*"];
+  }
+
+  return origins;
+}
+
+function getCorsOrigin(origin) {
+  if (!origin) {
+    return "*";
+  }
+
+  if (!CORS_ALLOWED_ORIGINS || CORS_ALLOWED_ORIGINS.length === 0) {
+    return origin;
+  }
+
+  if (CORS_ALLOWED_ORIGINS.includes("*")) {
+    return "*";
+  }
+
+  return CORS_ALLOWED_ORIGINS.includes(origin) ? origin : "";
+}
+
 function createApiHeaders(origin) {
-  return {
-    "Access-Control-Allow-Origin": origin || "*",
+  const allowOrigin = getCorsOrigin(origin);
+  const headers = {
     "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type",
     Vary: "Origin",
+  };
+
+  if (!allowOrigin) {
+    return headers;
+  }
+
+  return {
+    ...headers,
+    "Access-Control-Allow-Origin": allowOrigin,
   };
 }
 

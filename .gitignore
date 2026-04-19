@@ -1,4 +1,5 @@
 .DS_Store
 node_modules/
+dist/
 data/leaderboard.json
 data/players.json
